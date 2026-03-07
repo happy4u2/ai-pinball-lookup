@@ -1,5 +1,5 @@
 # AI Pinball Lookup
-
+TEST
 AI-assisted serverless backend for looking up pinball machine information by machine name.
 
 This project provides a structured API that returns reliable metadata about pinball machines using the Open Pinball Database (OPDB) and optional AI enrichment via Amazon Bedrock.
