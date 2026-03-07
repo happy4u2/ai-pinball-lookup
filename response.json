@@ -1,0 +1,1 @@
+{"statusCode":200,"headers":{"Content-Type":"application/json","Access-Control-Allow-Origin":"*"},"body":"{\"source\":\"lambda-mvp\",\"result\":{\"query\":\"Corvette\",\"normalized_query\":\"Corvette\",\"status\":\"accepted\",\"next_step\":\"Wire OPDB lookup service\"}}"}
