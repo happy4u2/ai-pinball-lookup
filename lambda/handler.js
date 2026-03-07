@@ -1,4 +1,4 @@
-import { opdbService } from "../scripts/opdbService.js";
+import { opdbService } from "./opdbService.js";
 
 function response(statusCode, body) {
   return {

@@ -15,6 +15,5 @@ export async function opdbService(machineName) {
     throw new Error(`OPDB request failed: ${response.status} ${response.statusText}`);
   }
 
-  const data = await response.json();
-  return data;
+  return await response.json();
 }
