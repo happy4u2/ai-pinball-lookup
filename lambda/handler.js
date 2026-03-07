@@ -1,4 +1,42 @@
-import { opdbService } from "./opdbService.js";
+import { opdbService } from "./scripts/opdbService.js";
+
+export const handler = async (event) => {
+  try {
+    console.log("Raw event:", JSON.stringify(event));
+
+    let body = {};
+
+    if (event.body) {
+      body = typeof event.body === "string" ? JSON.parse(event.body) : event.body;
+    } else {
+      body = event;
+    }
+
+    const machineName = body.machineName;
+
+    if (!machineName) {
+      return response(400, { error: "Missing machineName" });
+    }
+
+    console.log("Searching OPDB for:", machineName);
+
+    const results = await opdbService(machineName);
+
+    return response(200, {
+      source: "opdb-search",
+      query: machineName,
+      resultCount: results.length,
+      results
+    });
+  } catch (error) {
+    console.error("Handler error:", error);
+
+    return response(500, {
+      error: "Internal server error",
+      message: error.message
+    });
+  }
+};
 
 function response(statusCode, body) {
   return {
@@ -10,40 +48,3 @@ function response(statusCode, body) {
     body: JSON.stringify(body)
   };
 }
-
-export const handler = async (event) => {
-  try {
-    const body = event?.body ? JSON.parse(event.body) : {};
-    const machineName =
-      body.machineName ||
-      event?.queryStringParameters?.machineName ||
-      event?.queryStringParameters?.name;
-
-    if (!machineName) {
-      return response(400, { error: "Missing machineName" });
-    }
-
-    const results = await opdbService(machineName);
-
-    if (!results || results.length === 0) {
-      return response(404, {
-        error: "No machine found",
-        query: machineName
-      });
-    }
-
-    return response(200, {
-      source: "opdb-search",
-      query: machineName,
-      resultCount: results.length,
-      results
-    });
-  } catch (error) {
-    console.error("Lambda error:", error);
-
-    return response(500, {
-      error: "Internal server error",
-      message: error.message
-    });
-  }
-};
