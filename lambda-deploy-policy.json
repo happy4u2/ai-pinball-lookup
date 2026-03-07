@@ -1,0 +1,15 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "LambdaDeployExistingFunction",
+            "Effect": "Allow",
+            "Action": [
+                "lambda:GetFunctionConfiguration",
+                "lambda:UpdateFunctionCode",
+                "lambda:UpdateFunctionConfiguration"
+            ],
+            "Resource": "arn:aws:lambda:eu-central-1:465443875879:function:ai-pinball-lookup"
+        }
+    ]
+}

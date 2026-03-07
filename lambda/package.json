@@ -1,0 +1,10 @@
+{
+  "name": "ai-pinball-lookup-lambda",
+  "version": "0.1.0",
+  "description": "MVP Lambda for AI Pinball Lookup",
+  "type": "module",
+  "main": "handler.js",
+  "scripts": {
+    "test:local": "node handler.js"
+  }
+}
