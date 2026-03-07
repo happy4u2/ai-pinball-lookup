@@ -28,7 +28,10 @@ export const handler = async (event) => {
       resultCount: results.length,
       results
     });
+<<<<<<< HEAD
 
+=======
+>>>>>>> 6f96a5b (Phase 3 debug lamda function)
   } catch (error) {
     console.error("Handler error:", error);
 
