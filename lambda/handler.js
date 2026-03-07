@@ -1,53 +1,49 @@
-import { jsonResponse } from "./lib/response.js";
-import { normalizeMachineName } from "./lib/normalize.js";
+import { opdbService } from "../scripts/opdbService.js";
 
-export const handler = async (event = {}) => {
+function response(statusCode, body) {
+  return {
+    statusCode,
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*"
+    },
+    body: JSON.stringify(body)
+  };
+}
+
+export const handler = async (event) => {
   try {
-    const body = parseBody(event.body);
+    const body = event?.body ? JSON.parse(event.body) : {};
     const machineName =
-      body.machineName ??
-      event?.queryStringParameters?.machineName ??
-      event?.queryStringParameters?.name ??
-      "";
+      body.machineName ||
+      event?.queryStringParameters?.machineName ||
+      event?.queryStringParameters?.name;
 
-    const normalizedName = normalizeMachineName(machineName);
+    if (!machineName) {
+      return response(400, { error: "Missing machineName" });
+    }
 
-    if (!normalizedName) {
-      return jsonResponse(400, {
-        error: "Missing machineName",
-        message: "Provide a machineName in the JSON body or query string."
+    const results = await opdbService(machineName);
+
+    if (!results || results.length === 0) {
+      return response(404, {
+        error: "No machine found",
+        query: machineName
       });
     }
 
-    return jsonResponse(200, {
-      source: "lambda-mvp",
-      result: {
-        query: machineName,
-        normalized_query: normalizedName,
-        status: "accepted",
-        next_step: "Wire OPDB lookup service"
-      }
+    return response(200, {
+      source: "opdb-search",
+      query: machineName,
+      resultCount: results.length,
+      results
     });
   } catch (error) {
-    return jsonResponse(500, {
-      error: "InternalServerError",
-      message: error.message || "Unexpected error"
+    console.error("Lambda error:", error);
+
+    return response(500, {
+      error: "Internal server error",
+      message: error.message
     });
   }
 };
-
-function parseBody(body) {
-  if (!body) {
-    return {};
-  }
-
-  if (typeof body === "string") {
-    return JSON.parse(body);
-  }
-
-  if (typeof body === "object") {
-    return body;
-  }
-
-  return {};
-}
