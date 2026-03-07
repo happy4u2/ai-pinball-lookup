@@ -28,6 +28,7 @@ export const handler = async (event) => {
       resultCount: results.length,
       results
     });
+
   } catch (error) {
     console.error("Handler error:", error);
 
