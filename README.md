@@ -2,9 +2,7 @@
 
 AI-assisted serverless backend for looking up pinball machine information by machine name.
 
-This project provides a structured API that returns reliable metadata about pinball machines using the **Open Pinball Database (OPDB)** and optional **AI enrichment via Amazon Bedrock**.
-
----
+This project provides a structured API that returns reliable metadata about pinball machines using the Open Pinball Database (OPDB) and optional AI enrichment via Amazon Bedrock.
 
 ## Project Goal
 
@@ -12,7 +10,6 @@ Build an AWS-based backend where a user submits the name of a pinball machine an
 
 Example request:
 
-```json
 {
   "machineName": "Twilight Zone"
 }
@@ -27,205 +24,115 @@ Example response:
     "manufacturer": "Bally",
     "manufacture_date": "1993-05-04",
     "display": "DMD",
-    "player_count": 4,
-    "features": ["Widebody"]
+    "player_count": 4
   }
 }
-Architecture
 
-The system is designed as a serverless AWS architecture.
+## Architecture
 
-User Request
-     │
-     ▼
-API Gateway
-     │
-     ▼
-AWS Lambda (Node.js)
-     │
-     ▼
-OPDB Machine Lookup
-     │
-     ▼
-Optional AI enrichment (Amazon Bedrock)
-     │
-     ▼
+User Request  
+↓  
+API Gateway  
+↓  
+AWS Lambda (Node.js)  
+↓  
+OPDB Machine Lookup  
+↓  
+Optional AI enrichment (Amazon Bedrock)  
+↓  
 JSON Response
-Data Sources
-Open Pinball Database (OPDB)
+
+## Data Sources
+
+### Open Pinball Database (OPDB)
 
 Primary structured data source for pinball machines.
 
-Typical metadata returned:
+Typical metadata returned includes:
 
-Machine name
+- Machine name  
+- Short name  
+- Manufacturer  
+- Manufacture date  
+- Display type  
+- Player count  
+- Features  
+- Keywords  
+- Images  
 
-Short name
+### Amazon Bedrock
 
-Manufacturer
-
-Manufacture date
-
-Display type
-
-Player count
-
-Features
-
-Keywords
-
-Images
-
-Amazon Bedrock (Optional AI Layer)
-
-Amazon Bedrock can be used to enrich machine data with AI assistance.
+Amazon Bedrock can optionally be used to enrich machine data using AI.
 
 Possible uses include:
 
-Generating summaries of machines
+- generating summaries of machines  
+- normalizing machine names  
+- providing fallback descriptions  
+- flagging uncertain data  
 
-Normalizing machine names
+## Project Structure
 
-Providing fallback descriptions
-
-Flagging uncertain data
-
-Returning structured JSON responses
-
-The AI layer is optional and designed to enhance the quality of responses.
-
-Project Structure
 ai-pinball-lookup/
-│
-├── README.md
-├── .gitignore
-│
-├── docs/
-│   Architecture notes and documentation
-│
-├── lambda/
-│   AWS Lambda handlers and machine lookup logic
-│
-├── infra/
-│   Infrastructure configuration and deployment notes
-│
-├── tests/
-│   Unit and integration tests
-│
-└── scripts/
-    Development and deployment utilities
-Minimum Viable Product (MVP)
 
-The first version of the project will:
+README.md  
+.gitignore  
 
-Accept a pinball machine name
+docs/  
+Architecture notes and documentation  
 
-Query the OPDB database
+lambda/  
+AWS Lambda handlers and lookup logic  
 
-Return structured machine information
+infra/  
+Infrastructure configuration  
 
-Produce clean JSON responses
+tests/  
+Unit and integration tests  
 
-Handle missing or ambiguous matches safely
+scripts/  
+Development utilities  
 
-Future Enhancements
+## Minimum Viable Product
+
+The first working version will:
+
+- accept a pinball machine name
+- query the OPDB database
+- return structured machine information
+- produce clean JSON responses
+- handle missing or ambiguous matches safely
+
+## Future Enhancements
 
 Planned improvements include:
 
-AI-generated machine summaries
+- AI-generated machine summaries  
+- machine name disambiguation  
+- multi-match ranking  
+- API authentication  
+- request logging  
+- result caching  
+- frontend search interface  
 
-Machine name disambiguation
+## Development Roadmap
 
-Multi-match ranking
+Phase 1 — Repository bootstrap  
+Phase 2 — Lambda MVP  
+Phase 3 — API Gateway integration  
+Phase 4 — Bedrock enrichment  
+Phase 5 — Production hardening  
 
-API authentication
-
-Request logging
-
-Result caching
-
-Frontend search interface
-
-Machine alias detection
-
-Verification flags for uncertain data
-
-Example API Request
-GET /machine?name=Twilight%20Zone
-
-Example response:
-
-{
-  "source": "opdb-machine",
-  "result": {
-    "name": "Twilight Zone",
-    "manufacturer": "Bally",
-    "year": 1993,
-    "display": "DMD",
-    "players": 4
-  }
-}
-Development Roadmap
-Phase 1 — Repository Bootstrap
-
-Create repository structure and documentation.
-
-Phase 2 — Lambda MVP
-
-Build Lambda handler that:
-
-accepts machineName
-
-queries OPDB
-
-returns structured JSON
-
-Phase 3 — API Gateway
-
-Expose the service through a REST API endpoint.
-
-Phase 4 — AI Enrichment
-
-Integrate Amazon Bedrock for enhanced responses.
-
-Phase 5 — Production Hardening
-
-input validation
-
-logging
-
-error handling
-
-IAM security tightening
-
-rate limiting
-
-cost monitoring
-
-Status
+## Status
 
 Current status:
 
-Git repository initialized
+- Git repository created
+- GitHub repository connected
+- Initial project scaffold committed
+- Ready for Lambda implementation
 
-GitHub repository connected
+## Author
 
-Initial project scaffold created
-
-Ready for Lambda implementation
-
-Author
-
-David Haughton
+David Haughton  
 SwissPinball
-Pinball restoration, repair, and machine data tools
-
-
----
-
-### Then commit it
-
-```bash
-git add README.md
-git commit -m "Add project README"
-git push
