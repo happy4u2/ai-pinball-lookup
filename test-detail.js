@@ -1,4 +1,5 @@
 import { handler } from "./lambda/handler.js";
+import "dotenv/config";
 
 async function main() {
   const event = {

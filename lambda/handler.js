@@ -16,7 +16,10 @@ export const handler = async (event) => {
       body = event;
     }
 
-    const machineName = body.machineName;
+    const machineName =
+  body.machineName ||
+  event.queryStringParameters?.name ||
+  event.queryStringParameters?.machineName;
 
     if (!machineName) {
       return response(400, { error: "Missing machineName" });
