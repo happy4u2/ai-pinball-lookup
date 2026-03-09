@@ -1,5 +1,6 @@
 import { opdbService } from "./scripts/opdbService.js";
 import { opdbDetailService } from "./scripts/opdbDetailService.js";
+import { normalizeMachine } from "./scripts/normalizeMachine.js";
 
 export const handler = async (event) => {
   try {
@@ -39,6 +40,7 @@ export const handler = async (event) => {
     console.log("Fetching OPDB machine details for ID:", machineId);
 
     const machineDetails = await opdbDetailService(machineId);
+    const normalizedResult = normalizeMachine(machineDetails);
 
     return response(200, {
       source: "opdb-machine",
@@ -50,7 +52,7 @@ export const handler = async (event) => {
         supplementary: bestMatch.supplementary,
         display: bestMatch.display
       },
-      result: machineDetails
+      result: normalizedResult
     });
   } catch (error) {
     console.error("Handler error:", error);
