@@ -4,7 +4,7 @@ AI-assisted serverless backend for looking up pinball machine information by mac
 
 This project provides a structured API that returns reliable metadata about pinball machines using the Open Pinball Database (OPDB) and optional AI enrichment via Amazon Bedrock.
 
-## Project Goal
+## Project Goal 
 
 Build an AWS-based backend where a user submits the name of a pinball machine and receives structured machine information as JSON.
 
