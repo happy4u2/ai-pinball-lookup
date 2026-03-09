@@ -1,138 +1,185 @@
-# AI Pinball Lookup
+AI Pinball Lookup
 
-AI-assisted serverless backend for looking up pinball machine information by machine name.
+Serverless backend that returns structured pinball machine information using the Open Pinball Database (OPDB).
 
-This project provides a structured API that returns reliable metadata about pinball machines using the Open Pinball Database (OPDB) and optional AI enrichment via Amazon Bedrock.
+The system performs machine lookup, normalizes the data, and caches results in AWS DynamoDB to improve performance.
 
-## Project Goal 
+Project Status
 
-Build an AWS-based backend where a user submits the name of a pinball machine and receives structured machine information as JSON.
+Current Phase: Phase 7 — DynamoDB Cache deployed to Lambda
 
-Example request:
+Working features:
 
+OPDB typeahead machine search
+
+OPDB machine detail lookup
+
+normalized machine response format
+
+DynamoDB cache layer
+
+improved match selection (prefer original machines over special editions)
+
+deployed AWS Lambda backend
+
+local testing harness
+
+Architecture
+Client Request
+      ↓
+AWS Lambda
+      ↓
+DynamoDB Cache
+   ├─ HIT  → return cached machine
+   └─ MISS
+        ↓
+     OPDB Typeahead Search
+        ↓
+     Select Best Match
+        ↓
+     OPDB Machine Detail Lookup
+        ↓
+     Normalize Machine Data
+        ↓
+     Save to DynamoDB
+        ↓
+     Return JSON Response
+Example Request
 {
-  "machineName": "Twilight Zone"
+  "machineName": "Medieval Madness"
 }
-
-Example response:
-
+Example Response
 {
   "source": "opdb-machine",
+  "query": "Medieval Madness",
+  "selectedMatch": {
+    "id": "G5pe4-MePZv",
+    "text": "Medieval Madness (Williams, 1997)"
+  },
   "result": {
-    "name": "Twilight Zone",
-    "shortname": "TZ",
-    "manufacturer": "Bally",
-    "manufacture_date": "1993-05-04",
-    "display": "DMD",
-    "player_count": 4
+    "opdb_id": "G5pe4-MePZv",
+    "name": "Medieval Madness",
+    "shortname": "MM",
+    "manufacturer": "Williams",
+    "manufacture_date": "1997-06-01",
+    "display": "dmd",
+    "player_count": 4,
+    "primary_image": "https://img.opdb.org/..."
+  },
+  "cache": {
+    "hit": true,
+    "cachedAt": "2026-03-09T11:38:13.344Z"
   }
 }
+Project Structure
+ai-pinball-lookup
+│
+├─ lambda/
+│  ├─ handler.js
+│  ├─ package.json
+│  │
+│  └─ scripts/
+│     ├─ opdbService.js
+│     ├─ opdbDetailService.js
+│     ├─ normalizeMachine.js
+│     ├─ dynamoClient.js
+│     ├─ cacheService.js
+│     └─ selectBestMatch.js
+│
+├─ tests/
+│
+├─ test-event.json
+├─ test-handler.js
+├─ test-opdb.js
+├─ test-detail.js
+│
+└─ README.md
+Environment Variables
 
-## Architecture
+The Lambda function requires:
 
-User Request  
-↓  
-API Gateway  
-↓  
-AWS Lambda (Node.js)  
-↓  
-OPDB Machine Lookup  
-↓  
-Optional AI enrichment (Amazon Bedrock)  
-↓  
-JSON Response
+OPDB_API_TOKEN
+MACHINE_TABLE_NAME
+AWS_REGION
 
-## Data Sources
+Example:
 
-### Open Pinball Database (OPDB)
+OPDB_API_TOKEN=your_opdb_token
+MACHINE_TABLE_NAME=pinball_machines
+AWS_REGION=eu-central-1
+DynamoDB Table
 
-Primary structured data source for pinball machines.
+Table name:
 
-Typical metadata returned includes:
+pinball_machines
 
-- Machine name  
-- Short name  
-- Manufacturer  
-- Manufacture date  
-- Display type  
-- Player count  
-- Features  
-- Keywords  
-- Images  
+Partition key:
 
-### Amazon Bedrock
+machineKey (String)
 
-Amazon Bedrock can optionally be used to enrich machine data using AI.
+Example stored item:
 
-Possible uses include:
+machineKey: medieval madness
+query: Medieval Madness
+cachedAt: 2026-03-09T11:38:13.344Z
+result: { normalized machine data }
+Local Development
 
-- generating summaries of machines  
-- normalizing machine names  
-- providing fallback descriptions  
-- flagging uncertain data  
+Set environment variables:
 
-## Project Structure
+$env:AWS_PROFILE="dev"
+$env:AWS_REGION="eu-central-1"
+$env:OPDB_API_TOKEN="your_token"
+$env:MACHINE_TABLE_NAME="pinball_machines"
 
-ai-pinball-lookup/
+Run local test:
 
-README.md  
-.gitignore  
+node test-detail.js
+Deployment
 
-docs/  
-Architecture notes and documentation  
+Deployment is handled through GitHub Actions.
 
-lambda/  
-AWS Lambda handlers and lookup logic  
+Typical workflow:
 
-infra/  
-Infrastructure configuration  
+git add .
+git commit -m "update"
+git push
 
-tests/  
-Unit and integration tests  
+GitHub Actions deploys the Lambda automatically.
 
-scripts/  
-Development utilities  
+Development Phases
+Phase	Description
+1	Project bootstrap
+2	Lambda handler
+3	OPDB typeahead search
+4	OPDB machine detail lookup
+5	normalized response format
+6	DynamoDB cache (local)
+7	DynamoDB cache deployed to Lambda
+Planned Future Work
 
-## Minimum Viable Product
+Phase 8 possibilities:
 
-The first working version will:
+Amazon Bedrock AI machine summaries
 
-- accept a pinball machine name
-- query the OPDB database
-- return structured machine information
-- produce clean JSON responses
-- handle missing or ambiguous matches safely
+API Gateway public endpoint
 
-## Future Enhancements
+machine alias handling (TAF, TZ, MM)
 
-Planned improvements include:
+fuzzy search improvements
 
-- AI-generated machine summaries  
-- machine name disambiguation  
-- multi-match ranking  
-- API authentication  
-- request logging  
-- result caching  
-- frontend search interface  
+rule sheet lookup
 
-## Development Roadmap
+repair knowledge assistant
 
-Phase 1 — Repository bootstrap  
-Phase 2 — Lambda MVP  
-Phase 3 — API Gateway integration  
-Phase 4 — Bedrock enrichment  
-Phase 5 — Production hardening  
+Data Source
 
-## Status
+Machine data is provided by:
 
-Current status:
+Open Pinball Database (OPDB)
 
-- Git repository created
-- GitHub repository connected
-- Initial project scaffold committed
-- Ready for Lambda implementation
+https://opdb.org
 
-## Author
+License
 
-David Haughton  
-SwissPinball
+MIT
