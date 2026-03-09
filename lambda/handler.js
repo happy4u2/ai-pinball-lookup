@@ -4,6 +4,10 @@ import { normalizeMachine } from "./scripts/normalizeMachine.js";
 import { getCachedMachine, saveCachedMachine } from "./scripts/cacheService.js";
 import { resolveMatch } from "./scripts/resolveMatch.js";
 
+function normalizeCacheKey(text) {
+  return (text || "").trim().toLowerCase();
+}
+
 export const handler = async (event) => {
   try {
     console.log("Raw event:", JSON.stringify(event));
@@ -30,46 +34,46 @@ export const handler = async (event) => {
     }
 
     // Exact machine lookup by OPDB ID
-if (machineId) {
-  console.log("Direct machine lookup by ID:", machineId);
+    if (machineId) {
+      console.log("Direct machine lookup by ID:", machineId);
 
-  const machineDetails = await opdbDetailService(machineId);
-  const normalizedResult = normalizeMachine(machineDetails);
+      const machineDetails = await opdbDetailService(machineId);
+      const normalizedResult = normalizeMachine(machineDetails);
 
-  const supplementary = [
-    machineDetails.manufacturer?.name,
-    machineDetails.manufacture_date?.slice(0, 4)
-  ]
-    .filter(Boolean)
-    .join(", ");
+      const supplementary = [
+        machineDetails.manufacturer?.name,
+        machineDetails.manufacture_date?.slice(0, 4)
+      ]
+        .filter(Boolean)
+        .join(", ");
 
-  const payload = {
-    source: "opdb-machine",
-    selectedMatch: {
-      id: machineDetails.opdb_id,
-      text: machineDetails.name,
-      name: machineDetails.name,
-      supplementary: supplementary || null,
-      display: machineDetails.display || null
-    },
-    result: normalizedResult
-  };
+      const payload = {
+        source: "opdb-machine",
+        selectedMatch: {
+          id: machineDetails.opdb_id,
+          text: machineDetails.name,
+          name: machineDetails.name,
+          supplementary: supplementary || null,
+          display: machineDetails.display || null
+        },
+        result: normalizedResult
+      };
 
-  // Save the exact chosen machine to DynamoDB
-  await saveCachedMachine(machineDetails.name, payload);
+      // Cache exact machine selections only
+      await saveCachedMachine(machineDetails.name, payload);
 
-  return response(200, {
-    mode: "result",
-    source: payload.source,
-    query: machineName || machineDetails.name,
-    selectedMatch: payload.selectedMatch,
-    result: payload.result,
-    cache: {
-      hit: false,
-      cachedAt: null
+      return response(200, {
+        mode: "result",
+        source: payload.source,
+        query: machineName || machineDetails.name,
+        selectedMatch: payload.selectedMatch,
+        result: payload.result,
+        cache: {
+          hit: false,
+          cachedAt: null
+        }
+      });
     }
-  });
-}
 
     console.log("Checking DynamoDB cache for:", machineName);
 
@@ -155,7 +159,21 @@ if (machineId) {
       result: normalizedResult
     };
 
-    await saveCachedMachine(machineName, payload);
+    // Only cache exact-name matches.
+    // Do NOT cache broad ambiguous family searches like "Jurassic Park"
+    // when they resolve to a more specific machine.
+    const queryKey = normalizeCacheKey(machineName);
+    const selectedKey = normalizeCacheKey(bestMatch.name);
+
+    if (queryKey === selectedKey) {
+      await saveCachedMachine(machineName, payload);
+      console.log("Saved exact-name result to cache:", machineName);
+    } else {
+      console.log(
+        "Skipped caching broad query because selected machine differs:",
+        { machineName, selectedName: bestMatch.name }
+      );
+    }
 
     return response(200, {
       mode: "result",
