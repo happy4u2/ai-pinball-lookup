@@ -1,41 +1,52 @@
-# AI Pinball Lookup
+## Phase 8 — API Gateway
 
-Serverless backend that returns structured pinball machine information using the **Open Pinball Database (OPDB)**.
+The project now exposes a public HTTP API using **AWS API Gateway**.
 
-The system performs machine lookup, normalizes the data, and caches results in **AWS DynamoDB** to improve performance.
+### Public Base URL
 
----
-
-# Project Status
-
-Current Phase: **Phase 7 — DynamoDB Cache deployed to Lambda**
-
-Working features:
-
-- OPDB typeahead machine search
-- OPDB machine detail lookup
-- normalized machine response format
-- DynamoDB cache layer
-- improved match selection (prefer original machines over special editions)
-- deployed AWS Lambda backend
-- local testing harness
-
----
-
-# Architecture
-
+```text
+https://cp114tpb2i.execute-api.eu-central-1.amazonaws.com/prod
 ```
-Client Request
-      ↓
+
+### Route
+
+```text
+GET /machine
+```
+
+### Example Request
+
+```text
+GET /prod/machine?name=Addams%20Family
+```
+
+Full URL:
+
+```text
+https://cp114tpb2i.execute-api.eu-central-1.amazonaws.com/prod/machine?name=Addams%20Family
+```
+
+### Supported Query Parameters
+
+- `name`
+- `machineName`
+
+### Architecture
+
+```text
+Client
+  ↓
+API Gateway
+  ↓
 AWS Lambda
-      ↓
+  ↓
 DynamoDB Cache
    ├─ HIT  → return cached machine
    └─ MISS
         ↓
      OPDB Typeahead Search
         ↓
-     Select Best Match
+     Fallback Search / Match Scoring
         ↓
      OPDB Machine Detail Lookup
         ↓
@@ -46,191 +57,63 @@ DynamoDB Cache
      Return JSON Response
 ```
 
----
-
-# Example Request
-
-```json
-{
-  "machineName": "Medieval Madness"
-}
-```
-
----
-
-# Example Response
+### Example Response
 
 ```json
 {
   "source": "opdb-machine",
-  "query": "Medieval Madness",
+  "query": "Addams Family",
   "selectedMatch": {
-    "id": "G5pe4-MePZv",
-    "text": "Medieval Madness (Williams, 1997)"
+    "id": "G4ODR-MDXEy",
+    "text": "The Addams Family (Bally, 1992)"
   },
   "result": {
-    "opdb_id": "G5pe4-MePZv",
-    "name": "Medieval Madness",
-    "shortname": "MM",
-    "manufacturer": "Williams",
-    "manufacture_date": "1997-06-01",
+    "opdb_id": "G4ODR-MDXEy",
+    "name": "The Addams Family",
+    "shortname": "TAF",
+    "manufacturer": "Bally",
+    "manufacturer_full_name": "Bally Manufacturing Co.",
+    "manufacture_date": "1992-01-03",
+    "type": "ss",
     "display": "dmd",
-    "player_count": 4
+    "player_count": 4,
+    "features": [],
+    "keywords": ["movie"],
+    "ipdb_id": 20,
+    "description": "",
+    "primary_image": "https://img.opdb.org/85401531-c087-4f7d-9484-4e867418560a-large.jpg"
   },
   "cache": {
-    "hit": true,
-    "cachedAt": "2026-03-09T11:38:13.344Z"
+    "hit": true
   }
 }
 ```
 
----
+### Notes
 
-# Project Structure
+- The API is publicly accessible through API Gateway.
+- The Lambda handler supports both:
+  - JSON body input for local/Lambda testing
+  - query string input for HTTP API access
+- Current supported route:
+  - `GET /machine`
 
+### Current API Flow
+
+```text
+GET /machine?name=Twilight%20Zone
+        ↓
+API Gateway
+        ↓
+Lambda handler
+        ↓
+DynamoDB cache lookup
+   ├─ hit → return cached normalized result
+   └─ miss → OPDB search
+            → fallback search if needed
+            → best match scoring
+            → OPDB detail lookup
+            → normalize result
+            → save to DynamoDB
+            → return JSON
 ```
-ai-pinball-lookup
-│
-├─ lambda/
-│  ├─ handler.js
-│  ├─ package.json
-│  │
-│  └─ scripts/
-│     ├─ opdbService.js
-│     ├─ opdbDetailService.js
-│     ├─ normalizeMachine.js
-│     ├─ dynamoClient.js
-│     ├─ cacheService.js
-│     └─ selectBestMatch.js
-│
-├─ tests/
-│
-├─ test-event.json
-├─ test-handler.js
-├─ test-opdb.js
-├─ test-detail.js
-│
-└─ README.md
-```
-
----
-
-# Environment Variables
-
-The Lambda function requires:
-
-```
-OPDB_API_TOKEN
-MACHINE_TABLE_NAME
-AWS_REGION
-```
-
-Example:
-
-```
-OPDB_API_TOKEN=your_opdb_token
-MACHINE_TABLE_NAME=pinball_machines
-AWS_REGION=eu-central-1
-```
-
----
-
-# DynamoDB Table
-
-Table name:
-
-```
-pinball_machines
-```
-
-Partition key:
-
-```
-machineKey (String)
-```
-
-Example stored item:
-
-```
-machineKey: medieval madness
-query: Medieval Madness
-cachedAt: 2026-03-09T11:38:13.344Z
-result: { normalized machine data }
-```
-
----
-
-# Local Development
-
-Set environment variables:
-
-```powershell
-$env:AWS_PROFILE="dev"
-$env:AWS_REGION="eu-central-1"
-$env:OPDB_API_TOKEN="your_token"
-$env:MACHINE_TABLE_NAME="pinball_machines"
-```
-
-Run local test:
-
-```powershell
-node test-detail.js
-```
-
----
-
-# Deployment
-
-Deployment is handled through **GitHub Actions**.
-
-Typical workflow:
-
-```bash
-git add .
-git commit -m "update"
-git push
-```
-
-GitHub Actions deploys the Lambda automatically.
-
----
-
-# Development Phases
-
-| Phase | Description |
-|------|-------------|
-| 1 | Project bootstrap |
-| 2 | Lambda handler |
-| 3 | OPDB typeahead search |
-| 4 | OPDB machine detail lookup |
-| 5 | normalized response format |
-| 6 | DynamoDB cache (local) |
-| 7 | DynamoDB cache deployed to Lambda |
-
----
-
-# Planned Future Work
-
-Phase 8 possibilities:
-
-- Amazon Bedrock AI machine summaries
-- API Gateway public endpoint
-- machine alias handling (TAF, TZ, MM)
-- fuzzy search improvements
-- rule sheet lookup
-- repair knowledge assistant
-
----
-
-# Data Source
-
-Machine data is provided by:
-
-**Open Pinball Database (OPDB)**  
-https://opdb.org
-
----
-
-# License
-
-MIT
