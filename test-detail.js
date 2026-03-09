@@ -3,7 +3,7 @@ import "dotenv/config";
 
 async function main() {
   const event = {
-    machineName: "Addams Family"
+    machineName: "Jurassic Park"
   };
 
   const result = await handler(event);

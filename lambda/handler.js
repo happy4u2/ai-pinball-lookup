@@ -2,7 +2,7 @@ import { opdbService } from "./scripts/opdbService.js";
 import { opdbDetailService } from "./scripts/opdbDetailService.js";
 import { normalizeMachine } from "./scripts/normalizeMachine.js";
 import { getCachedMachine, saveCachedMachine } from "./scripts/cacheService.js";
-import { selectBestMatch } from "./scripts/selectBestMatch.js";
+import { resolveMatch } from "./scripts/resolveMatch.js";
 
 export const handler = async (event) => {
   try {
@@ -17,9 +17,9 @@ export const handler = async (event) => {
     }
 
     const machineName =
-  body.machineName ||
-  event.queryStringParameters?.name ||
-  event.queryStringParameters?.machineName;
+      body.machineName ||
+      event.queryStringParameters?.name ||
+      event.queryStringParameters?.machineName;
 
     if (!machineName) {
       return response(400, { error: "Missing machineName" });
@@ -33,6 +33,7 @@ export const handler = async (event) => {
       console.log("Cache hit for:", machineName);
 
       return response(200, {
+        mode: "result",
         source: cached.source,
         query: cached.query,
         selectedMatch: cached.selectedMatch,
@@ -44,26 +45,55 @@ export const handler = async (event) => {
       });
     }
 
-    console.log("Cache miss. Searching OPDB for:", machineName);
+    const primaryResults = await opdbService(machineName);
+    
+    console.log("Primary OPDB results:", JSON.stringify(primaryResults, null, 2));
+    
+    let results = [...primaryResults];
 
-    const results = await opdbService(machineName);
+    if (!machineName.toLowerCase().startsWith("the ")) {
+      const altQuery = `The ${machineName}`;
+      const altResults = await opdbService(altQuery);
 
-    if (!results || results.length === 0) {
+      const seen = new Set(results.map((r) => r.id));
+      for (const item of altResults) {
+        if (!seen.has(item.id)) {
+          results.push(item);
+          seen.add(item.id);
+        }
+      }
+    }
+
+    console.log("Combined OPDB results:", JSON.stringify(results, null, 2));
+    
+    if (!results.length) {
       return response(404, {
+        mode: "not_found",
         error: "Machine not found",
         query: machineName,
-        resultCount: 0,
-        results: []
+        matches: []
       });
     }
 
-    const bestMatch = selectBestMatch(machineName, results);
-    const machineId = bestMatch.id;
+    const matchResolution = resolveMatch(machineName, results);
 
-    console.log("Best OPDB match:", bestMatch);
-    console.log("Fetching OPDB machine details for ID:", machineId);
+    if (matchResolution.mode === "disambiguation") {
+      return response(200, {
+        mode: "disambiguation",
+        query: machineName,
+        matches: matchResolution.matches,
+        cache: {
+          hit: false,
+          cachedAt: null
+        }
+      });
+    }
 
-    const machineDetails = await opdbDetailService(machineId);
+    const bestMatch = matchResolution.selectedMatch;
+
+    console.log("Selected OPDB match:", bestMatch);
+
+    const machineDetails = await opdbDetailService(bestMatch.id);
     const normalizedResult = normalizeMachine(machineDetails);
 
     const payload = {
@@ -81,6 +111,7 @@ export const handler = async (event) => {
     await saveCachedMachine(machineName, payload);
 
     return response(200, {
+      mode: "result",
       source: payload.source,
       query: machineName,
       selectedMatch: payload.selectedMatch,

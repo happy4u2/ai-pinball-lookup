@@ -35,6 +35,8 @@ export default function App() {
     }
   }
 
+  const mode = data?.mode;
+  const matches = data?.matches || [];
   const result = data?.result;
   const selectedMatch = data?.selectedMatch;
   const cache = data?.cache;
@@ -59,7 +61,7 @@ export default function App() {
           <div className="grid grid-cols-3 gap-3 text-sm">
             <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
               <div className="text-slate-500">Phase</div>
-              <div className="mt-1 text-lg font-semibold">8</div>
+              <div className="mt-1 text-lg font-semibold">9</div>
             </div>
             <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
               <div className="text-slate-500">Runtime</div>
@@ -78,8 +80,8 @@ export default function App() {
               <div>
                 <h2 className="text-xl font-semibold">Machine lookup</h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  Try a search like Twilight Zone, Addams Family, or Medieval
-                  Madness.
+                  Try a search like Twilight Zone, Addams Family, Jurassic Park,
+                  or Medieval Madness.
                 </p>
               </div>
               <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
@@ -112,6 +114,52 @@ export default function App() {
               </div>
             )}
 
+            {mode === "disambiguation" && (
+              <div className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-amber-900">
+                      Multiple machines found
+                    </h3>
+                    <p className="mt-1 text-sm text-amber-800">
+                      Select the exact version you want to inspect.
+                    </p>
+                  </div>
+                  <div className="rounded-full bg-white px-3 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
+                    Disambiguation
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {matches.map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => {
+                        setMachineName(m.name);
+                        searchMachine(m.name);
+                      }}
+                      className="w-full rounded-2xl border border-amber-200 bg-white px-4 py-4 text-left shadow-sm transition hover:bg-amber-100"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <div className="font-semibold text-slate-900">
+                            {m.name}
+                          </div>
+                          <div className="mt-1 text-sm text-slate-600">
+                            {m.supplementary}
+                            {m.display ? ` · ${m.display}` : ""}
+                          </div>
+                        </div>
+                        <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                          score {m.score}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="text-sm text-slate-500">Selected match</div>
@@ -119,7 +167,10 @@ export default function App() {
                   {selectedMatch?.name || selectedMatch?.text || "—"}
                 </div>
                 <div className="mt-1 text-sm text-slate-600">
-                  {selectedMatch?.supplementary || "No result yet"}
+                  {selectedMatch?.supplementary ||
+                    (mode === "disambiguation"
+                      ? "Choose one of the matches above"
+                      : "No result yet")}
                   {selectedMatch?.display ? ` · ${selectedMatch.display}` : ""}
                 </div>
               </div>
@@ -134,6 +185,16 @@ export default function App() {
                 </div>
               </div>
             </div>
+
+            {result?.primary_image && mode === "result" && (
+              <div className="mt-6 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <img
+                  src={result.primary_image}
+                  alt={result.name || "Pinball machine"}
+                  className="h-72 w-full object-cover"
+                />
+              </div>
+            )}
 
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -180,8 +241,9 @@ export default function App() {
                 {[
                   "Corvette",
                   "Twilight Zone",
-                  "Medieval Madness",
+                  "Jurassic Park",
                   "Addams Family",
+                  "Addams Family Gold",
                 ].map((item) => (
                   <button
                     key={item}
@@ -205,7 +267,7 @@ export default function App() {
                   "Lambda parses machine name",
                   "DynamoDB cache is checked",
                   "OPDB searched if cache miss",
-                  "Best match selected and normalized",
+                  "Best match selected or disambiguated",
                   "Response returned as JSON",
                 ].map((step) => (
                   <div
