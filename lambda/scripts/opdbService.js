@@ -1,19 +1,24 @@
 export async function opdbService(machineName) {
-  if (!machineName || !machineName.trim()) {
-    throw new Error("machineName is required");
+  if (!machineName) {
+    throw new Error("Missing machineName");
   }
 
   const url = `https://opdb.org/api/search/typeahead?q=${encodeURIComponent(machineName)}`;
 
-  const response = await fetch(url, {
-    headers: {
-      Accept: "application/json"
-    }
-  });
+  const response = await fetch(url);
 
   if (!response.ok) {
-    throw new Error(`OPDB request failed: ${response.status} ${response.statusText}`);
+    const text = await response.text();
+    throw new Error(`OPDB typeahead request failed: ${response.status} ${response.statusText} - ${text}`);
   }
 
-  return await response.json();
+  const data = await response.json();
+
+  return data.map((item) => ({
+    id: item.id,
+    text: item.text,
+    name: item.name,
+    supplementary: item.supplementary,
+    display: item.display
+  }));
 }

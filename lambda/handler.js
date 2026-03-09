@@ -1,4 +1,5 @@
 import { opdbService } from "./scripts/opdbService.js";
+import { opdbDetailService } from "./scripts/opdbDetailService.js";
 
 export const handler = async (event) => {
   try {
@@ -22,11 +23,34 @@ export const handler = async (event) => {
 
     const results = await opdbService(machineName);
 
+    if (!results || results.length === 0) {
+      return response(404, {
+        error: "Machine not found",
+        query: machineName,
+        resultCount: 0,
+        results: []
+      });
+    }
+
+    const bestMatch = results[0];
+    const machineId = bestMatch.id;
+
+    console.log("Best OPDB match:", bestMatch);
+    console.log("Fetching OPDB machine details for ID:", machineId);
+
+    const machineDetails = await opdbDetailService(machineId);
+
     return response(200, {
-      source: "opdb-search",
+      source: "opdb-machine",
       query: machineName,
-      resultCount: results.length,
-      results
+      selectedMatch: {
+        id: bestMatch.id,
+        text: bestMatch.text,
+        name: bestMatch.name,
+        supplementary: bestMatch.supplementary,
+        display: bestMatch.display
+      },
+      result: machineDetails
     });
   } catch (error) {
     console.error("Handler error:", error);
