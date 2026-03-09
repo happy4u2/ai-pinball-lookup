@@ -2,7 +2,7 @@ import { handler } from "./lambda/handler.js";
 
 async function main() {
   const event = {
-    machineName: "Medieval Madness"
+    machineName: "Addams Family"
   };
 
   const result = await handler(event);

@@ -2,6 +2,7 @@ import { opdbService } from "./scripts/opdbService.js";
 import { opdbDetailService } from "./scripts/opdbDetailService.js";
 import { normalizeMachine } from "./scripts/normalizeMachine.js";
 import { getCachedMachine, saveCachedMachine } from "./scripts/cacheService.js";
+import { selectBestMatch } from "./scripts/selectBestMatch.js";
 
 export const handler = async (event) => {
   try {
@@ -53,7 +54,7 @@ export const handler = async (event) => {
       });
     }
 
-    const bestMatch = results[0];
+    const bestMatch = selectBestMatch(machineName, results);
     const machineId = bestMatch.id;
 
     console.log("Best OPDB match:", bestMatch);
