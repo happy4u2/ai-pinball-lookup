@@ -30,37 +30,46 @@ export const handler = async (event) => {
     }
 
     // Exact machine lookup by OPDB ID
-    if (machineId) {
-      console.log("Direct machine lookup by ID:", machineId);
+if (machineId) {
+  console.log("Direct machine lookup by ID:", machineId);
 
-      const machineDetails = await opdbDetailService(machineId);
-      const normalizedResult = normalizeMachine(machineDetails);
+  const machineDetails = await opdbDetailService(machineId);
+  const normalizedResult = normalizeMachine(machineDetails);
 
-      const supplementary = [
-        machineDetails.manufacturer?.name,
-        machineDetails.manufacture_date?.slice(0, 4)
-      ]
-        .filter(Boolean)
-        .join(", ");
+  const supplementary = [
+    machineDetails.manufacturer?.name,
+    machineDetails.manufacture_date?.slice(0, 4)
+  ]
+    .filter(Boolean)
+    .join(", ");
 
-      return response(200, {
-        mode: "result",
-        source: "opdb-machine",
-        query: machineName || null,
-        selectedMatch: {
-          id: machineDetails.opdb_id,
-          text: machineDetails.name,
-          name: machineDetails.name,
-          supplementary: supplementary || null,
-          display: machineDetails.display || null
-        },
-        result: normalizedResult,
-        cache: {
-          hit: false,
-          cachedAt: null
-        }
-      });
+  const payload = {
+    source: "opdb-machine",
+    selectedMatch: {
+      id: machineDetails.opdb_id,
+      text: machineDetails.name,
+      name: machineDetails.name,
+      supplementary: supplementary || null,
+      display: machineDetails.display || null
+    },
+    result: normalizedResult
+  };
+
+  // Save the exact chosen machine to DynamoDB
+  await saveCachedMachine(machineDetails.name, payload);
+
+  return response(200, {
+    mode: "result",
+    source: payload.source,
+    query: machineName || machineDetails.name,
+    selectedMatch: payload.selectedMatch,
+    result: payload.result,
+    cache: {
+      hit: false,
+      cachedAt: null
     }
+  });
+}
 
     console.log("Checking DynamoDB cache for:", machineName);
 

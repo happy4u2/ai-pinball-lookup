@@ -160,8 +160,8 @@ export default function App() {
                       key={m.id}
                       onClick={() => {
                         setMachineName(m.name);
-      searchMachineById(m.id);
-    }}
+                        searchMachineById(m.id);
+                    }}
                       className="w-full rounded-2xl border border-amber-200 bg-white px-4 py-4 text-left shadow-sm transition hover:bg-amber-100"
                     >
                       <div className="flex items-start justify-between gap-4">
