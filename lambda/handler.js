@@ -21,8 +21,45 @@ export const handler = async (event) => {
       event.queryStringParameters?.name ||
       event.queryStringParameters?.machineName;
 
-    if (!machineName) {
-      return response(400, { error: "Missing machineName" });
+    const machineId =
+      body.id ||
+      event.queryStringParameters?.id;
+
+    if (!machineName && !machineId) {
+      return response(400, { error: "Missing machineName or id" });
+    }
+
+    // Exact machine lookup by OPDB ID
+    if (machineId) {
+      console.log("Direct machine lookup by ID:", machineId);
+
+      const machineDetails = await opdbDetailService(machineId);
+      const normalizedResult = normalizeMachine(machineDetails);
+
+      const supplementary = [
+        machineDetails.manufacturer?.name,
+        machineDetails.manufacture_date?.slice(0, 4)
+      ]
+        .filter(Boolean)
+        .join(", ");
+
+      return response(200, {
+        mode: "result",
+        source: "opdb-machine",
+        query: machineName || null,
+        selectedMatch: {
+          id: machineDetails.opdb_id,
+          text: machineDetails.name,
+          name: machineDetails.name,
+          supplementary: supplementary || null,
+          display: machineDetails.display || null
+        },
+        result: normalizedResult,
+        cache: {
+          hit: false,
+          cachedAt: null
+        }
+      });
     }
 
     console.log("Checking DynamoDB cache for:", machineName);
@@ -45,10 +82,11 @@ export const handler = async (event) => {
       });
     }
 
+    console.log("Cache miss. Searching OPDB for:", machineName);
+
     const primaryResults = await opdbService(machineName);
-    
     console.log("Primary OPDB results:", JSON.stringify(primaryResults, null, 2));
-    
+
     let results = [...primaryResults];
 
     if (!machineName.toLowerCase().startsWith("the ")) {
@@ -65,7 +103,7 @@ export const handler = async (event) => {
     }
 
     console.log("Combined OPDB results:", JSON.stringify(results, null, 2));
-    
+
     if (!results.length) {
       return response(404, {
         mode: "not_found",
