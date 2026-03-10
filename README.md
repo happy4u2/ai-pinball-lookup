@@ -2,17 +2,23 @@
 
 Serverless pinball machine lookup API built on AWS.
 
-This project provides intelligent search, disambiguation, and normalized machine data powered by the **Open Pinball Database (OPDB)**.
+This project provides intelligent search, disambiguation, and normalized machine data powered by the **Open Pinball Database (OPDB)** and enhanced with **SwissPinball machine metadata stored in DynamoDB**.
 
-The system supports:
+The system is designed to evolve into a **machine knowledge database** capable of storing manuals, repair notes, parts, and AI-assisted diagnostics.
 
-- machine search
-- variant disambiguation
-- typeahead suggestions
-- DynamoDB caching
-- normalized machine metadata
+---
 
-The backend powers a React UI and is designed to integrate into **SwissPinball.com**.
+# Project Goals
+
+The long-term goal is to build a **machine intelligence layer for pinball machines**.
+
+The system should be able to:
+
+- identify pinball machines
+- return structured machine data
+- store machine-specific knowledge
+- manage manuals and documentation
+- assist with repair diagnostics using AI
 
 ---
 
@@ -32,29 +38,46 @@ AWS Lambda (Node.js 24)
    │
    ├── DynamoDB Cache
    │
-   └── OPDB API
+   ├── Machine Metadata Database
+   │
+   ├── OPDB API
+   │
+   └── AI Services (Amazon Bedrock)
 ```
 
-Request flow:
+---
 
-```
-Search query
-   │
-   ▼
-Typeahead endpoint (?q=)
-   │
-   ▼
-Machine lookup (?name= or ?id=)
-   │
-   ▼
-Match resolution
-   │
-   ▼
-Machine details
-   │
-   ▼
-Normalized response
-```
+# Core Data Sources
+
+## OPDB (Open Pinball Database)
+
+Primary structured machine data source.
+
+Provides:
+
+- machine name
+- manufacturer
+- year
+- display type
+- player count
+- IPDB reference
+
+---
+
+## SwissPinball Metadata
+
+Stored in DynamoDB.
+
+Used for:
+
+- manuals
+- repair notes
+- common issues
+- service tags
+- parts
+- content descriptions
+
+This becomes the **persistent machine knowledge layer**.
 
 ---
 
@@ -116,14 +139,15 @@ Possible responses:
     "name": "Twilight Zone",
     "supplementary": "Bally, 1993"
   },
-  "result": { ... },
-  "cache": {
-    "hit": false
-  }
+  "result": {}
 }
 ```
 
+---
+
 ### Disambiguation
+
+Returned when multiple machine variants exist.
 
 ```json
 {
@@ -147,7 +171,7 @@ Possible responses:
 ## Machine Lookup by OPDB ID
 
 ```
-GET /machine?id=G4ZVB-MJ5lE
+GET /machine?id=GrXzD-MjBPX
 ```
 
 Example response
@@ -157,11 +181,11 @@ Example response
   "mode": "result",
   "source": "opdb-machine",
   "selectedMatch": {
-    "id": "G4ZVB-MJ5lE",
-    "name": "Jurassic Park",
-    "supplementary": "Data East, 1993"
+    "id": "GrXzD-MjBPX",
+    "name": "Twilight Zone",
+    "supplementary": "Bally, 1993"
   },
-  "result": { ... }
+  "result": {}
 }
 ```
 
@@ -180,8 +204,123 @@ lambda/
     ├── resolveMatch.js
     ├── normalizeMachine.js
     ├── cacheService.js
-    └── dynamoClient.js
+    ├── dynamoClient.js
+    ├── metadataService.js
+    ├── metadataMapper.js
+    ├── metadataKeys.js
+    ├── mergeMachineData.js
+    ├── ipdbManualService.js
+    └── aiManualClassifier.js (planned)
 ```
+
+---
+
+# DynamoDB Tables
+
+## Machine Cache
+
+```
+pinball_machines
+```
+
+Used to cache OPDB responses.
+
+Primary key:
+
+```
+machineKey
+```
+
+Example keys
+
+```
+id:G4ZVB-MJ5lE
+name:twilight zone
+```
+
+---
+
+## Machine Metadata
+
+```
+pinball_machine_metadata
+```
+
+Stores persistent machine knowledge.
+
+Primary key
+
+```
+machineId
+```
+
+Example
+
+```
+opdb:grxzd-mjbpx
+```
+
+---
+
+# Machine Metadata Model
+
+Example record
+
+```json
+{
+  "machineId": "opdb:grxzd-mjbpx",
+
+  "name": "Twilight Zone",
+  "manufacturer": "Bally",
+  "normalizedName": "twilight zone",
+
+  "references": {
+    "opdbId": "GrXzD-MjBPX",
+    "ipdbId": 2684,
+    "ipdbMachineUrl": "https://www.ipdb.org/machine.cgi?id=2684"
+  },
+
+  "manuals": [],
+
+  "manualCandidates": [],
+
+  "commonIssues": [],
+  "repairNotes": [],
+  "parts": [],
+
+  "serviceTags": [],
+
+  "content": {
+    "shortDescription": "",
+    "longDescription": "",
+    "keywords": []
+  },
+
+  "discovery": {
+    "lastManualDiscoveryAt": null,
+    "lastManualDiscoveryStatus": "not_attempted"
+  },
+
+  "status": "active",
+  "schemaVersion": 2,
+
+  "createdAt": "",
+  "updatedAt": ""
+}
+```
+
+---
+
+# Cache Strategy
+
+| Query Type        | Cached |
+| ----------------- | ------ |
+| Typeahead         | No     |
+| Ambiguous search  | No     |
+| Exact machine ID  | Yes    |
+| Exact title match | Yes    |
+
+This prevents disambiguation results from being cached incorrectly.
 
 ---
 
@@ -201,74 +340,121 @@ Scoring factors include:
 - year weighting
 - variant penalties
 
-Example machine families:
+---
+
+# Example Machine Families
 
 ```
 Addams Family
-    ├── The Addams Family (1992)
-    ├── The Addams Family Gold
-    └── The Addams Family Special Collectors Edition
+ ├─ The Addams Family (1992)
+ ├─ The Addams Family Gold
+ └─ The Addams Family Special Collectors Edition
 
 Jurassic Park
-    ├── Jurassic Park (1993)
-    ├── The Lost World Jurassic Park
-    ├── Jurassic Park (Pro)
-    ├── Jurassic Park (Premium)
-    └── Jurassic Park (LE)
+ ├─ Jurassic Park (1993)
+ ├─ The Lost World Jurassic Park
+ ├─ Jurassic Park (Pro)
+ ├─ Jurassic Park (Premium)
+ └─ Jurassic Park (LE)
 ```
 
 ---
 
-# DynamoDB Cache
+# Manual Discovery System (Planned)
 
-Table
+The system will support **automatic manual discovery and AI-assisted classification**.
 
-```
-pinball_machines
-```
+Manual ingestion follows a three-layer model.
 
-Primary key
+---
 
-```
-machineKey
-```
+## 1 Discovery
 
-Example keys
+The system gathers candidate links from multiple sources.
 
-```
-id:G4ZVB-MJ5lE
-name:twilight zone
-```
+Example sources:
 
-Example record
+- IPDB
+- manufacturer documentation
+- community resources
+- curated document repositories
+
+These are stored as **manualCandidates**.
+
+---
+
+## 2 AI Classification
+
+Candidates are analyzed using **Amazon Bedrock**.
+
+AI determines:
+
+- document type
+- relevance
+- confidence score
+
+Example output
 
 ```json
 {
-  "machineKey": "id:g4zvb-mj5le",
-  "query": "Jurassic Park",
-  "source": "opdb-machine",
-  "selectedMatch": { ... },
-  "result": { ... },
-  "cachedAt": "2026-03-10T09:05:31Z"
+  "url": "https://example.com/tz-manual.pdf",
+  "type": "manual",
+  "relevant": true,
+  "confidence": 0.94
 }
 ```
 
-Cache strategy
+---
 
-| Query Type        | Cached |
-| ----------------- | ------ |
-| Typeahead         | No     |
-| Ambiguous search  | No     |
-| Exact machine ID  | Yes    |
-| Exact title match | Yes    |
+## 3 Verification
 
-This prevents disambiguation results from being incorrectly cached.
+Manuals can then be approved and moved to the **manuals** list.
+
+Example
+
+```json
+{
+  "title": "Twilight Zone Operations Manual",
+  "url": "https://example.com/tz-manual.pdf",
+  "type": "manual",
+  "verified": true
+}
+```
+
+---
+
+# AI Technology Stack
+
+The project will use **Amazon Bedrock**.
+
+```
+AI Platform: Amazon Bedrock
+Model: Claude
+API: Converse API
+Runtime: AWS Lambda Node.js
+Storage: DynamoDB
+```
+
+AI will assist with:
+
+- manual candidate classification
+- document type detection
+- relevance scoring
+- duplicate detection
+- manual summarization
+- repair knowledge extraction
 
 ---
 
 # Frontend
 
-React + Vite + Tailwind.
+Built with
+
+```
+React
+Vite
+TailwindCSS
+```
 
 Local development
 
@@ -283,84 +469,95 @@ Local UI
 http://localhost:5173
 ```
 
-Frontend features
-
-- typeahead search
-- suggestion selection
-- machine preview
-- normalized JSON viewer
-
 ---
 
 # Technologies
 
 Backend
 
-- AWS Lambda (Node.js 24)
-- API Gateway
-- DynamoDB
-- AWS SDK v3
+```
+AWS Lambda (Node.js 24)
+API Gateway
+DynamoDB
+AWS SDK v3
+Amazon Bedrock
+```
 
 Frontend
 
-- React
-- Vite
-- TailwindCSS
+```
+React
+Vite
+TailwindCSS
+```
 
-External data
+External Data
 
-- OPDB (Open Pinball Database)
+```
+OPDB (Open Pinball Database)
+IPDB (Internet Pinball Database)
+```
 
 ---
 
 # Current Project Phase
 
-```
-Phase 9
-Typeahead + Disambiguation + DynamoDB Cache
-```
+Phase 11  
+Machine metadata foundation
 
 Working features
 
-- OPDB search
-- machine detail lookup
+- OPDB machine lookup
+- machine detail retrieval
 - intelligent match resolution
 - disambiguation system
 - DynamoDB caching
-- React UI
-- typeahead suggestions
+- persistent machine metadata
+- IPDB reference integration
 
 ---
 
-# Future Plans
+# Upcoming Phases
 
-Backend improvements
+Phase 12  
+Manual discovery pipeline
 
-- query analyzer
-- improved ranking engine
-- machine family grouping
-- persistent machine metadata store
+Phase 13  
+AI manual classification
 
-Future features
+Phase 14  
+Manual verification workflow
 
-- AI repair assistant
-- machine knowledge base
-- SwissPinball integration
-- WordPress REST integration
+Phase 15  
+Machine repair knowledge extraction
 
-Example future capability
+---
+
+# Future Capabilities
+
+Example
+
+Machine
 
 ```
-Machine: Bally Corvette
-Problem: weak flipper
+Bally Corvette
+```
+
+Problem
+
+```
+weak flipper
 ```
 
 AI could return
 
-- likely causes
-- coil specifications
-- EOS switch test procedure
-- replacement parts list
+```
+likely causes
+coil specifications
+EOS switch tests
+replacement parts
+repair procedures
+```
 
 ---
 
@@ -377,3 +574,19 @@ Author
 ```
 SwissPinball
 ```
+
+---
+
+# Vision
+
+The long-term goal is to build the **most useful pinball machine knowledge system for technicians and collectors**.
+
+A system capable of combining:
+
+- machine data
+- manuals
+- parts
+- repair knowledge
+- AI-assisted diagnostics
+
+into a single searchable platform.
