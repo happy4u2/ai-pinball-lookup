@@ -213,18 +213,10 @@ export const handler = async (event) => {
       result: normalizedResult,
     };
 
-    const queryKey = normalizeCacheKey(machineName);
-    const selectedKey = normalizeCacheKey(bestMatch.name);
-
-    if (queryKey === selectedKey) {
-      await saveCachedMachine(`name:${selectedKey}`, payload);
-      console.log("Saved exact-name result to cache:", `name:${selectedKey}`);
-    } else {
-      console.log(
-        "Skipped caching broad query because selected machine differs:",
-        { machineName, selectedName: bestMatch.name },
-      );
-    }
+    console.log("Skipping exact-name cache write:", {
+      machineName,
+      selectedName: bestMatch.name,
+    });
 
     return response(200, {
       mode: "result",
