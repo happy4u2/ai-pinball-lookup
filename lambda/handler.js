@@ -1,7 +1,7 @@
 import { opdbService } from "./scripts/opdbService.js";
 import { opdbDetailService } from "./scripts/opdbDetailService.js";
 import { normalizeMachine } from "./scripts/normalizeMachine.js";
-import { getCachedMachine, saveCachedMachine } from "./scripts/cacheService.js";
+import { saveCachedMachine } from "./scripts/cacheService.js";
 import { resolveMatch } from "./scripts/resolveMatch.js";
 
 function normalizeCacheKey(text) {
@@ -59,8 +59,9 @@ export const handler = async (event) => {
         result: normalizedResult
       };
 
-      // Cache exact machine selections only
-      await saveCachedMachine(machineDetails.name, payload);
+      // Cache exact machine selections by OPDB ID only
+      await saveCachedMachine(`id:${machineDetails.opdb_id}`, payload);
+      console.log("Saved ID-based cache entry:", `id:${machineDetails.opdb_id}`);
 
       return response(200, {
         mode: "result",
@@ -75,25 +76,11 @@ export const handler = async (event) => {
       });
     }
 
-    console.log("Checking DynamoDB cache for:", machineName);
-
-    const cached = await getCachedMachine(machineName);
-
-    if (cached) {
-      console.log("Cache hit for:", machineName);
-
-      return response(200, {
-        mode: "result",
-        source: cached.source,
-        query: cached.query,
-        selectedMatch: cached.selectedMatch,
-        result: cached.result,
-        cache: {
-          hit: true,
-          cachedAt: cached.cachedAt
-        }
-      });
-    }
+    // IMPORTANT:
+    // Name-based cache reads are intentionally disabled for now.
+    // This prevents broad family titles like "Jurassic Park"
+    // from returning a poisoned cached exact machine result.
+    console.log("Skipping name-based cache read for:", machineName);
 
     console.log("Cache miss. Searching OPDB for:", machineName);
 
@@ -129,6 +116,8 @@ export const handler = async (event) => {
     const matchResolution = resolveMatch(machineName, results);
 
     if (matchResolution.mode === "disambiguation") {
+      console.log("Disambiguation required for:", machineName);
+
       return response(200, {
         mode: "disambiguation",
         query: machineName,
@@ -141,7 +130,6 @@ export const handler = async (event) => {
     }
 
     const bestMatch = matchResolution.selectedMatch;
-
     console.log("Selected OPDB match:", bestMatch);
 
     const machineDetails = await opdbDetailService(bestMatch.id);
@@ -166,8 +154,8 @@ export const handler = async (event) => {
     const selectedKey = normalizeCacheKey(bestMatch.name);
 
     if (queryKey === selectedKey) {
-      await saveCachedMachine(machineName, payload);
-      console.log("Saved exact-name result to cache:", machineName);
+      await saveCachedMachine(`name:${selectedKey}`, payload);
+      console.log("Saved exact-name result to cache:", `name:${selectedKey}`);
     } else {
       console.log(
         "Skipped caching broad query because selected machine differs:",
