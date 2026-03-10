@@ -8,6 +8,7 @@ import { createMetadataShell } from "./scripts/metadataMapper.js";
 import { mergeMachineData } from "./scripts/mergeMachineData.js";
 import { buildMachineId } from "./scripts/metadataKeys.js";
 import { discoverIpdbManuals } from "./scripts/ipdbManualService.js";
+import { updateMetadataRecord } from "./scripts/updateMetadataRecord.js";
 
 function normalizeCacheKey(text) {
   return (text || "").trim().toLowerCase();
@@ -70,7 +71,35 @@ export const handler = async (event) => {
     } else {
       body = event;
     }
+    const httpMethod = event.httpMethod || "GET";
+    const action = body.action || null;
+    if (httpMethod === "POST" && action === "updateMetadata") {
+      const metadataMachineId = body.machineId;
 
+      if (!metadataMachineId) {
+        return response(400, {
+          error: "Missing machineId",
+        });
+      }
+
+      let metadata = await getMetadata(metadataMachineId);
+
+      if (!metadata) {
+        return response(404, {
+          error: "Metadata record not found",
+          machineId: metadataMachineId,
+        });
+      }
+
+      metadata = updateMetadataRecord(metadata, body);
+      metadata = await saveMetadata(metadata);
+
+      return response(200, {
+        ok: true,
+        machineId: metadataMachineId,
+        updatedMetadata: metadata,
+      });
+    }
     const searchQuery = event.queryStringParameters?.q;
 
     const machineName =
