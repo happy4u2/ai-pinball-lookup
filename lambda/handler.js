@@ -195,6 +195,24 @@ export const handler = async (event) => {
     }
 
     const bestMatch = matchResolution.selectedMatch;
+    const idCacheKey = `id:${bestMatch.id}`;
+    const cached = await getCachedMachine(idCacheKey);
+
+    if (cached) {
+      console.log("Reusing ID cache for:", idCacheKey);
+
+      return response(200, {
+        mode: "result",
+        source: cached.source,
+        query: machineName,
+        selectedMatch: cached.selectedMatch,
+        result: cached.result,
+        cache: {
+          hit: true,
+          cachedAt: cached.cachedAt,
+        },
+      });
+    }
     console.log("Selected OPDB match:", bestMatch);
 
     const machineDetails = await opdbDetailService(bestMatch.id);
