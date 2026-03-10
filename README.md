@@ -1,16 +1,16 @@
 # AI Pinball Lookup
 
-Serverless pinball machine lookup API built on AWS.
+Serverless pinball machine lookup and technical knowledge API built on AWS.
 
-This project provides intelligent search, disambiguation, and normalized machine data powered by the **Open Pinball Database (OPDB)** and enhanced with **SwissPinball machine metadata stored in DynamoDB**.
+This project provides intelligent machine identification, variant disambiguation, and structured pinball machine data powered by the **Open Pinball Database (OPDB)** and enhanced with **SwissPinball technical metadata stored in DynamoDB**.
 
-The system is designed to evolve into a **machine knowledge database** capable of storing manuals, repair notes, parts, and AI-assisted diagnostics.
+The system is designed to evolve into a **machine intelligence platform for technicians and collectors**, capable of storing manuals, repair knowledge, service history, and customer machine records.
 
 ---
 
 # Project Goals
 
-The long-term goal is to build a **machine intelligence layer for pinball machines**.
+The long-term goal is to build a **pinball machine intelligence system**.
 
 The system should be able to:
 
@@ -18,7 +18,9 @@ The system should be able to:
 - return structured machine data
 - store machine-specific knowledge
 - manage manuals and documentation
-- assist with repair diagnostics using AI
+- store repair knowledge and common issues
+- manage customer machines and service history
+- assist technicians using AI
 
 ---
 
@@ -36,9 +38,9 @@ API Gateway
    ▼
 AWS Lambda (Node.js 24)
    │
-   ├── DynamoDB Cache
+   ├── DynamoDB Machine Cache
    │
-   ├── Machine Metadata Database
+   ├── DynamoDB Machine Metadata
    │
    ├── OPDB API
    │
@@ -51,7 +53,7 @@ AWS Lambda (Node.js 24)
 
 ## OPDB (Open Pinball Database)
 
-Primary structured machine data source.
+Primary machine reference source.
 
 Provides:
 
@@ -74,8 +76,8 @@ Used for:
 - repair notes
 - common issues
 - service tags
-- parts
-- content descriptions
+- parts references
+- technical descriptions
 
 This becomes the **persistent machine knowledge layer**.
 
@@ -174,18 +176,34 @@ Returned when multiple machine variants exist.
 GET /machine?id=GrXzD-MjBPX
 ```
 
+---
+
+## Update Machine Metadata
+
+```
+POST /machine
+```
+
+Used to update machine technical metadata.
+
+Example request
+
+```json
+{
+  "action": "updateMetadata",
+  "machineId": "opdb:grxzd-mjbpx",
+  "commonIssues": ["Clock board faults", "Powerball / gumball handling issues"],
+  "repairNotes": ["Check clock board voltages first"],
+  "serviceTags": ["wpc", "widebody", "clock"]
+}
+```
+
 Example response
 
 ```json
 {
-  "mode": "result",
-  "source": "opdb-machine",
-  "selectedMatch": {
-    "id": "GrXzD-MjBPX",
-    "name": "Twilight Zone",
-    "supplementary": "Bally, 1993"
-  },
-  "result": {}
+  "ok": true,
+  "machineId": "opdb:grxzd-mjbpx"
 }
 ```
 
@@ -209,6 +227,7 @@ lambda/
     ├── metadataMapper.js
     ├── metadataKeys.js
     ├── mergeMachineData.js
+    ├── updateMetadataRecord.js
     ├── ipdbManualService.js
     └── aiManualClassifier.js (planned)
 ```
@@ -225,7 +244,7 @@ pinball_machines
 
 Used to cache OPDB responses.
 
-Primary key:
+Primary key
 
 ```
 machineKey
@@ -281,7 +300,6 @@ Example record
   },
 
   "manuals": [],
-
   "manualCandidates": [],
 
   "commonIssues": [],
@@ -294,11 +312,6 @@ Example record
     "shortDescription": "",
     "longDescription": "",
     "keywords": []
-  },
-
-  "discovery": {
-    "lastManualDiscoveryAt": null,
-    "lastManualDiscoveryStatus": "not_attempted"
   },
 
   "status": "active",
@@ -364,28 +377,19 @@ Jurassic Park
 
 The system will support **automatic manual discovery and AI-assisted classification**.
 
-Manual ingestion follows a three-layer model.
+Manual ingestion follows three stages:
 
----
+1. **Discovery**
 
-## 1 Discovery
-
-The system gathers candidate links from multiple sources.
-
-Example sources:
+Candidate manual links gathered from sources such as:
 
 - IPDB
 - manufacturer documentation
-- community resources
 - curated document repositories
 
-These are stored as **manualCandidates**.
+2. **AI Classification**
 
----
-
-## 2 AI Classification
-
-Candidates are analyzed using **Amazon Bedrock**.
+Candidates analyzed using **Amazon Bedrock**.
 
 AI determines:
 
@@ -393,39 +397,13 @@ AI determines:
 - relevance
 - confidence score
 
-Example output
+3. **Verification**
 
-```json
-{
-  "url": "https://example.com/tz-manual.pdf",
-  "type": "manual",
-  "relevant": true,
-  "confidence": 0.94
-}
-```
-
----
-
-## 3 Verification
-
-Manuals can then be approved and moved to the **manuals** list.
-
-Example
-
-```json
-{
-  "title": "Twilight Zone Operations Manual",
-  "url": "https://example.com/tz-manual.pdf",
-  "type": "manual",
-  "verified": true
-}
-```
+Approved manuals are stored in the `manuals` list.
 
 ---
 
 # AI Technology Stack
-
-The project will use **Amazon Bedrock**.
 
 ```
 AI Platform: Amazon Bedrock
@@ -437,11 +415,9 @@ Storage: DynamoDB
 
 AI will assist with:
 
-- manual candidate classification
-- document type detection
-- relevance scoring
-- duplicate detection
+- document classification
 - manual summarization
+- duplicate detection
 - repair knowledge extraction
 
 ---
@@ -502,8 +478,9 @@ IPDB (Internet Pinball Database)
 
 # Current Project Phase
 
-Phase 11  
-Machine metadata foundation
+**Phase 12**
+
+Machine metadata editing API
 
 Working features
 
@@ -513,23 +490,24 @@ Working features
 - disambiguation system
 - DynamoDB caching
 - persistent machine metadata
+- machine metadata editing via API
 - IPDB reference integration
 
 ---
 
 # Upcoming Phases
 
-Phase 12  
-Manual discovery pipeline
-
 Phase 13  
-AI manual classification
+Customer database
 
 Phase 14  
-Manual verification workflow
+Customer machine instances
 
 Phase 15  
-Machine repair knowledge extraction
+Service history and repair logs
+
+Phase 16  
+AI technician assistant
 
 ---
 
@@ -579,14 +557,14 @@ SwissPinball
 
 # Vision
 
-The long-term goal is to build the **most useful pinball machine knowledge system for technicians and collectors**.
-
-A system capable of combining:
+The long-term goal is to build the **most useful pinball machine knowledge system for technicians and collectors**, combining:
 
 - machine data
 - manuals
-- parts
+- parts references
 - repair knowledge
+- customer machines
+- service history
 - AI-assisted diagnostics
 
-into a single searchable platform.
+into a single platform.
