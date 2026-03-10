@@ -115,26 +115,26 @@ export function resolveMatch(query, results) {
   }));
 
   const queryBase = baseTitle(query);
+
   const sameFamily = scored.filter(
     (entry) => baseTitle(entry.item.name) === queryBase
   );
 
-  const partialFamilyMatches = scored.filter(
-    (entry) => baseTitle(entry.item.name).includes(queryBase)
-  );
+  const queryHasExplicitVariant =
+    normalizeTitle(query) !== queryBase;
 
-  if (!queryHasExplicitVariant && queryBase && partialFamilyMatches.length >= 2) {
+  if (!queryHasExplicitVariant && sameFamily.length >= 2) {
     return {
       mode: "disambiguation",
       matches: shortlist
     };
   }
 
+  const partialFamilyMatches = queryBase
+    ? scored.filter((entry) => baseTitle(entry.item.name).includes(queryBase))
+    : [];
 
-  const queryHasExplicitVariant =
-    normalizeTitle(query) !== queryBase;
- 
-    if (!queryHasExplicitVariant && sameFamily.length >= 2) {
+  if (!queryHasExplicitVariant && partialFamilyMatches.length >= 2) {
     return {
       mode: "disambiguation",
       matches: shortlist
