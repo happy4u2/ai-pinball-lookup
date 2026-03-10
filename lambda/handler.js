@@ -207,6 +207,7 @@ export const handler = async (event) => {
         id: bestMatch.id,
         text: bestMatch.text,
         name: bestMatch.name,
+
         supplementary: bestMatch.supplementary,
         display: bestMatch.display,
       },
