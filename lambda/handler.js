@@ -9,6 +9,11 @@ import { mergeMachineData } from "./scripts/mergeMachineData.js";
 import { buildMachineId } from "./scripts/metadataKeys.js";
 import { discoverIpdbManuals } from "./scripts/ipdbManualService.js";
 import { updateMetadataRecord } from "./scripts/updateMetadataRecord.js";
+import {
+  createCustomer,
+  getCustomer,
+  listCustomers,
+} from "./scripts/customerService.js";
 
 function normalizeCacheKey(text) {
   return (text || "").trim().toLowerCase();
@@ -73,6 +78,24 @@ export const handler = async (event) => {
     }
     const httpMethod = event.httpMethod || "GET";
     const action = body.action || null;
+
+    if (httpMethod === "POST" && event.rawPath === "/customers") {
+      const customer = await createCustomer(body);
+
+      return response(200, {
+        ok: true,
+        customer,
+      });
+    }
+    if (httpMethod === "GET" && event.rawPath === "/customers") {
+      const customers = await listCustomers();
+
+      return response(200, {
+        ok: true,
+        customers,
+      });
+    }
+
     if (httpMethod === "POST" && action === "updateMetadata") {
       const metadataMachineId = body.machineId;
 
