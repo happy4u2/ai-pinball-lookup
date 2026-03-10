@@ -1,7 +1,7 @@
 import { opdbService } from "./scripts/opdbService.js";
 import { opdbDetailService } from "./scripts/opdbDetailService.js";
 import { normalizeMachine } from "./scripts/normalizeMachine.js";
-import { saveCachedMachine } from "./scripts/cacheService.js";
+import { getCachedMachine, saveCachedMachine } from "./scripts/cacheService.js";
 import { resolveMatch } from "./scripts/resolveMatch.js";
 
 function normalizeCacheKey(text) {
@@ -54,8 +54,30 @@ export const handler = async (event) => {
         suggestions,
       });
     }
+
     // Exact machine lookup by OPDB ID
     if (machineId) {
+      const idCacheKey = `id:${machineId}`;
+      console.log("Checking ID cache for:", idCacheKey);
+
+      const cached = await getCachedMachine(idCacheKey);
+
+      if (cached) {
+        console.log("ID cache hit for:", idCacheKey);
+
+        return response(200, {
+          mode: "result",
+          source: cached.source,
+          query: cached.query,
+          selectedMatch: cached.selectedMatch,
+          result: cached.result,
+          cache: {
+            hit: true,
+            cachedAt: cached.cachedAt,
+          },
+        });
+      }
+
       console.log("Direct machine lookup by ID:", machineId);
 
       const machineDetails = await opdbDetailService(machineId);
@@ -70,6 +92,7 @@ export const handler = async (event) => {
 
       const payload = {
         source: "opdb-machine",
+        query: machineDetails.name,
         selectedMatch: {
           id: machineDetails.opdb_id,
           text: machineDetails.name,
@@ -80,7 +103,6 @@ export const handler = async (event) => {
         result: normalizedResult,
       };
 
-      // Cache exact machine selections by OPDB ID only
       await saveCachedMachine(`id:${machineDetails.opdb_id}`, payload);
       console.log(
         "Saved ID-based cache entry:",
@@ -90,7 +112,7 @@ export const handler = async (event) => {
       return response(200, {
         mode: "result",
         source: payload.source,
-        query: machineName || machineDetails.name,
+        query: machineDetails.name,
         selectedMatch: payload.selectedMatch,
         result: payload.result,
         cache: {
@@ -100,8 +122,27 @@ export const handler = async (event) => {
       });
     }
 
-    // Name-based cache reads intentionally disabled for now
-    console.log("Skipping name-based cache read for:", machineName);
+    // Safe exact-name cache read only
+    const nameCacheKey = `name:${normalizeCacheKey(machineName)}`;
+    console.log("Checking exact-name cache for:", nameCacheKey);
+
+    const cachedByName = await getCachedMachine(nameCacheKey);
+
+    if (cachedByName) {
+      console.log("Exact-name cache hit for:", nameCacheKey);
+
+      return response(200, {
+        mode: "result",
+        source: cachedByName.source,
+        query: cachedByName.query,
+        selectedMatch: cachedByName.selectedMatch,
+        result: cachedByName.result,
+        cache: {
+          hit: true,
+          cachedAt: cachedByName.cachedAt,
+        },
+      });
+    }
 
     console.log("Cache miss. Searching OPDB for:", machineName);
 
@@ -161,6 +202,7 @@ export const handler = async (event) => {
 
     const payload = {
       source: "opdb-machine",
+      query: bestMatch.name,
       selectedMatch: {
         id: bestMatch.id,
         text: bestMatch.text,
