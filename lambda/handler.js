@@ -3,9 +3,27 @@ import { opdbDetailService } from "./scripts/opdbDetailService.js";
 import { normalizeMachine } from "./scripts/normalizeMachine.js";
 import { getCachedMachine, saveCachedMachine } from "./scripts/cacheService.js";
 import { resolveMatch } from "./scripts/resolveMatch.js";
+import { getMetadata, saveMetadata } from "./scripts/metadataService.js";
+import { createMetadataShell } from "./scripts/metadataMapper.js";
+import { mergeMachineData } from "./scripts/mergeMachineData.js";
+import { buildMachineId } from "./scripts/metadataKeys.js";
 
 function normalizeCacheKey(text) {
   return (text || "").trim().toLowerCase();
+}
+
+async function enrichWithMetadata(machine) {
+  const metadataMachineId = buildMachineId(machine.opdb_id || machine.id);
+
+  let metadata = await getMetadata(metadataMachineId);
+
+  if (!metadata) {
+    metadata = createMetadataShell(machine);
+    await saveMetadata(metadata);
+    console.log("Created metadata shell:", metadataMachineId);
+  }
+
+  return mergeMachineData(machine, metadata);
 }
 
 export const handler = async (event) => {
@@ -65,12 +83,14 @@ export const handler = async (event) => {
       if (cached) {
         console.log("ID cache hit for:", idCacheKey);
 
+        const enrichedMachine = await enrichWithMetadata(cached.result);
+
         return response(200, {
           mode: "result",
           source: cached.source,
           query: cached.query,
           selectedMatch: cached.selectedMatch,
-          result: cached.result,
+          result: enrichedMachine,
           cache: {
             hit: true,
             cachedAt: cached.cachedAt,
@@ -82,6 +102,7 @@ export const handler = async (event) => {
 
       const machineDetails = await opdbDetailService(machineId);
       const normalizedResult = normalizeMachine(machineDetails);
+      const enrichedMachine = await enrichWithMetadata(normalizedResult);
 
       const supplementary = [
         machineDetails.manufacturer?.name,
@@ -100,7 +121,7 @@ export const handler = async (event) => {
           supplementary: supplementary || null,
           display: machineDetails.display || null,
         },
-        result: normalizedResult,
+        result: enrichedMachine,
       };
 
       await saveCachedMachine(`id:${machineDetails.opdb_id}`, payload);
@@ -131,12 +152,14 @@ export const handler = async (event) => {
     if (cachedByName) {
       console.log("Exact-name cache hit for:", nameCacheKey);
 
+      const enrichedMachine = await enrichWithMetadata(cachedByName.result);
+
       return response(200, {
         mode: "result",
         source: cachedByName.source,
         query: cachedByName.query,
         selectedMatch: cachedByName.selectedMatch,
-        result: cachedByName.result,
+        result: enrichedMachine,
         cache: {
           hit: true,
           cachedAt: cachedByName.cachedAt,
@@ -201,22 +224,26 @@ export const handler = async (event) => {
     if (cached) {
       console.log("Reusing ID cache for:", idCacheKey);
 
+      const enrichedMachine = await enrichWithMetadata(cached.result);
+
       return response(200, {
         mode: "result",
         source: cached.source,
         query: machineName,
         selectedMatch: cached.selectedMatch,
-        result: cached.result,
+        result: enrichedMachine,
         cache: {
           hit: true,
           cachedAt: cached.cachedAt,
         },
       });
     }
+
     console.log("Selected OPDB match:", bestMatch);
 
     const machineDetails = await opdbDetailService(bestMatch.id);
     const normalizedResult = normalizeMachine(machineDetails);
+    const enrichedMachine = await enrichWithMetadata(normalizedResult);
 
     const payload = {
       source: "opdb-machine",
@@ -225,12 +252,14 @@ export const handler = async (event) => {
         id: bestMatch.id,
         text: bestMatch.text,
         name: bestMatch.name,
-
         supplementary: bestMatch.supplementary,
         display: bestMatch.display,
       },
-      result: normalizedResult,
+      result: enrichedMachine,
     };
+
+    await saveCachedMachine(`id:${bestMatch.id}`, payload);
+    console.log("Saved resolved ID cache entry:", `id:${bestMatch.id}`);
 
     console.log("Skipping exact-name cache write:", {
       machineName,
