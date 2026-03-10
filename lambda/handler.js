@@ -78,7 +78,7 @@ export const handler = async (event) => {
     }
     const httpMethod = event.httpMethod || "GET";
     const action = body.action || null;
-
+    const searchQuery = event.queryStringParameters?.q;
     if (httpMethod === "POST" && event.rawPath === "/customers") {
       const customer = await createCustomer(body);
 
@@ -123,7 +123,6 @@ export const handler = async (event) => {
         updatedMetadata: metadata,
       });
     }
-    const searchQuery = event.queryStringParameters?.q;
 
     const machineName =
       body.machineName ||
