@@ -590,5 +590,3 @@ A system capable of combining:
 - AI-assisted diagnostics
 
 into a single searchable platform.
-
-Dave Haughton
