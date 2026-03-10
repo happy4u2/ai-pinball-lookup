@@ -4,32 +4,10 @@ import { normalizeMachine } from "./scripts/normalizeMachine.js";
 import { saveCachedMachine } from "./scripts/cacheService.js";
 import { resolveMatch } from "./scripts/resolveMatch.js";
 
-const searchQuery =
-  event.queryStringParameters?.q;
-  
-  function normalizeCacheKey(text) {
+function normalizeCacheKey(text) {
   return (text || "").trim().toLowerCase();
 }
-// TYPEAHEAD SEARCH
-if (searchQuery) {
-  console.log("Typeahead search:", searchQuery);
 
-  const results = await opdbService(searchQuery);
-
-  const suggestions = results.slice(0, 10).map((item) => ({
-    id: item.id,
-    text: item.text,
-    name: item.name,
-    supplementary: item.supplementary,
-    display: item.display
-  }));
-
-  return response(200, {
-    mode: "typeahead",
-    query: searchQuery,
-    suggestions
-  });
-}
 export const handler = async (event) => {
   try {
     console.log("Raw event:", JSON.stringify(event));
