@@ -1,161 +1,190 @@
-function normalizeTitle(text) {
-  return (text || "")
-    .toLowerCase()
-    .replace(/[^\w\s]/g, "")
-    .replace(/\bthe\b/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+import { opdbService } from "./scripts/opdbService.js";
+import { opdbDetailService } from "./scripts/opdbDetailService.js";
+import { normalizeMachine } from "./scripts/normalizeMachine.js";
+import { saveCachedMachine } from "./scripts/cacheService.js";
+import { resolveMatch } from "./scripts/resolveMatch.js";
+
+function normalizeCacheKey(text) {
+  return (text || "").trim().toLowerCase();
 }
 
-function baseTitle(text) {
-  return normalizeTitle(text)
-    .replace(
-      /\b(gold|limited|edition|special|premium|le|collector|anniversary|deluxe|remake|redux|pro|home edition|30th anniversary)\b/g,
-      ""
-    )
-    .replace(/\s+/g, " ")
-    .trim();
-}
+export const handler = async (event) => {
+  try {
+    console.log("Raw event:", JSON.stringify(event));
 
-function extractYear(supplementary) {
-  const match = supplementary?.match(/\b(19|20)\d{2}\b/);
-  return match ? Number(match[0]) : null;
-}
+    let body = {};
 
-function scoreResult(query, item) {
-  const normalizedQuery = normalizeTitle(query);
-  const normalizedName = normalizeTitle(item.name);
-  const normalizedText = normalizeTitle(item.text);
-
-  let score = 0;
-
-  if (normalizedName === normalizedQuery) {
-    score += 100;
-  }
-
-  if (normalizedText.startsWith(normalizedQuery)) {
-    score += 25;
-  }
-
-  if (normalizedName.includes(normalizedQuery)) {
-    score += 20;
-  }
-
-  const variantWords = [
-    "gold",
-    "limited",
-    "edition",
-    "special",
-    "premium",
-    "le",
-    "collector",
-    "anniversary",
-    "deluxe",
-    "remake",
-    "redux",
-    "pro",
-    "home edition",
-    "30th anniversary"
-  ];
-
-  for (const word of variantWords) {
-    const re = new RegExp(`\\b${word}\\b`, "i");
-
-    const queryHasWord = re.test(query || "");
-    const itemHasWord = re.test(item.name || "") || re.test(item.text || "");
-
-    if (queryHasWord && itemHasWord) {
-      score += 40;
-    } else if (!queryHasWord && itemHasWord) {
-      score -= 50;
+    if (event.body) {
+      body = typeof event.body === "string" ? JSON.parse(event.body) : event.body;
+    } else {
+      body = event;
     }
-  }
 
-  const year = extractYear(item.supplementary);
-  if (year) {
-    score += (2100 - year) / 10;
-  }
+    const machineName =
+      body.machineName ||
+      event.queryStringParameters?.name ||
+      event.queryStringParameters?.machineName;
 
-  return score;
-}
+    const machineId =
+      body.id ||
+      event.queryStringParameters?.id;
 
-export function resolveMatch(query, results) {
-  if (!results?.length) {
-    return {
-      mode: "not_found",
-      matches: []
-    };
-  }
-
-  const scored = results.map((item, index) => ({
-    item,
-    index,
-    score: scoreResult(query, item)
-  }));
-
-  scored.sort((a, b) => {
-    if (b.score !== a.score) {
-      return b.score - a.score;
+    if (!machineName && !machineId) {
+      return response(400, { error: "Missing machineName or id" });
     }
-    return a.index - b.index;
-  });
 
-  console.log("Scored matches:", JSON.stringify(scored, null, 2));
+    // Exact machine lookup by OPDB ID
+    if (machineId) {
+      console.log("Direct machine lookup by ID:", machineId);
 
-  const top = scored[0];
-  const second = scored[1] || null;
+      const machineDetails = await opdbDetailService(machineId);
+      const normalizedResult = normalizeMachine(machineDetails);
 
-  const shortlist = scored.slice(0, 5).map((entry) => ({
-    id: entry.item.id,
-    text: entry.item.text,
-    name: entry.item.name,
-    supplementary: entry.item.supplementary,
-    display: entry.item.display,
-    score: entry.score
-  }));
+      const supplementary = [
+        machineDetails.manufacturer?.name,
+        machineDetails.manufacture_date?.slice(0, 4)
+      ]
+        .filter(Boolean)
+        .join(", ");
 
-  const queryBase = baseTitle(query);
-  const sameFamily = scored.filter(
-    (entry) => baseTitle(entry.item.name) === queryBase
-  );
+      const payload = {
+        source: "opdb-machine",
+        selectedMatch: {
+          id: machineDetails.opdb_id,
+          text: machineDetails.name,
+          name: machineDetails.name,
+          supplementary: supplementary || null,
+          display: machineDetails.display || null
+        },
+        result: normalizedResult
+      };
 
-  const queryHasExplicitVariant =
-    normalizeTitle(query) !== queryBase;
+      // Cache exact machine selections by OPDB ID only
+      await saveCachedMachine(`id:${machineDetails.opdb_id}`, payload);
+      console.log("Saved ID-based cache entry:", `id:${machineDetails.opdb_id}`);
 
-  if (!queryHasExplicitVariant && sameFamily.length >= 2) {
-    return {
-      mode: "disambiguation",
-      matches: shortlist
+      return response(200, {
+        mode: "result",
+        source: payload.source,
+        query: machineName || machineDetails.name,
+        selectedMatch: payload.selectedMatch,
+        result: payload.result,
+        cache: {
+          hit: false,
+          cachedAt: null
+        }
+      });
+    }
+
+    // Name-based cache reads intentionally disabled for now
+    console.log("Skipping name-based cache read for:", machineName);
+
+    console.log("Cache miss. Searching OPDB for:", machineName);
+
+    const primaryResults = await opdbService(machineName);
+    console.log("Primary OPDB results:", JSON.stringify(primaryResults, null, 2));
+
+    let results = [...primaryResults];
+
+    if (!machineName.toLowerCase().startsWith("the ")) {
+      const altQuery = `The ${machineName}`;
+      const altResults = await opdbService(altQuery);
+
+      const seen = new Set(results.map((r) => r.id));
+      for (const item of altResults) {
+        if (!seen.has(item.id)) {
+          results.push(item);
+          seen.add(item.id);
+        }
+      }
+    }
+
+    console.log("Combined OPDB results:", JSON.stringify(results, null, 2));
+
+    if (!results.length) {
+      return response(404, {
+        mode: "not_found",
+        error: "Machine not found",
+        query: machineName,
+        matches: []
+      });
+    }
+
+    const matchResolution = resolveMatch(machineName, results);
+
+    if (matchResolution.mode === "disambiguation") {
+      console.log("Disambiguation required for:", machineName);
+
+      return response(200, {
+        mode: "disambiguation",
+        query: machineName,
+        matches: matchResolution.matches,
+        cache: {
+          hit: false,
+          cachedAt: null
+        }
+      });
+    }
+
+    const bestMatch = matchResolution.selectedMatch;
+    console.log("Selected OPDB match:", bestMatch);
+
+    const machineDetails = await opdbDetailService(bestMatch.id);
+    const normalizedResult = normalizeMachine(machineDetails);
+
+    const payload = {
+      source: "opdb-machine",
+      selectedMatch: {
+        id: bestMatch.id,
+        text: bestMatch.text,
+        name: bestMatch.name,
+        supplementary: bestMatch.supplementary,
+        display: bestMatch.display
+      },
+      result: normalizedResult
     };
+
+    const queryKey = normalizeCacheKey(machineName);
+    const selectedKey = normalizeCacheKey(bestMatch.name);
+
+    if (queryKey === selectedKey) {
+      await saveCachedMachine(`name:${selectedKey}`, payload);
+      console.log("Saved exact-name result to cache:", `name:${selectedKey}`);
+    } else {
+      console.log(
+        "Skipped caching broad query because selected machine differs:",
+        { machineName, selectedName: bestMatch.name }
+      );
+    }
+
+    return response(200, {
+      mode: "result",
+      source: payload.source,
+      query: machineName,
+      selectedMatch: payload.selectedMatch,
+      result: payload.result,
+      cache: {
+        hit: false,
+        cachedAt: null
+      }
+    });
+  } catch (error) {
+    console.error("Handler error:", error);
+
+    return response(500, {
+      error: "Internal server error",
+      message: error.message
+    });
   }
+};
 
-  // NEW: catches fragment searches like "addams"
-  const partialFamilyMatches = scored.filter((entry) => {
-    const itemBase = baseTitle(entry.item.name);
-    return itemBase.includes(queryBase);
-  });
-
-  if (!queryHasExplicitVariant && queryBase && partialFamilyMatches.length >= 2) {
-    return {
-      mode: "disambiguation",
-      matches: shortlist
-    };
-  }
-
-  const clearlyBetter =
-    !second ||
-    top.score - second.score >= 35;
-
-  if (clearlyBetter) {
-    return {
-      mode: "selected",
-      selectedMatch: top.item,
-      matches: shortlist
-    };
-  }
-
+function response(statusCode, body) {
   return {
-    mode: "disambiguation",
-    matches: shortlist
+    statusCode,
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*"
+    },
+    body: JSON.stringify(body)
   };
 }
