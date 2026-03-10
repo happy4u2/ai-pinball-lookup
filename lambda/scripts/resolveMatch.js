@@ -10,7 +10,7 @@ function normalizeTitle(text) {
 function baseTitle(text) {
   return normalizeTitle(text)
     .replace(
-      /\b(gold|limited|edition|special|premium|le|collector|anniversary|deluxe|remake|redux|pro|home edition|30th anniversary)\b/g,
+      /\b(gold|limited|edition|special|premium|le|collector|collectors|anniversary|deluxe|remake|redux|pro|home edition|30th anniversary|special collectors edition)\b/g,
       ""
     )
     .replace(/\s+/g, " ")
@@ -49,13 +49,15 @@ function scoreResult(query, item) {
     "premium",
     "le",
     "collector",
+    "collectors",
     "anniversary",
     "deluxe",
     "remake",
     "redux",
     "pro",
     "home edition",
-    "30th anniversary"
+    "30th anniversary",
+    "special collectors edition"
   ];
 
   for (const word of variantWords) {
@@ -87,11 +89,21 @@ export function resolveMatch(query, results) {
     };
   }
 
-  const scored = results.map((item, index) => ({
-    item,
-    index,
-    score: scoreResult(query, item)
-  }));
+  const normalizedQuery = normalizeTitle(query);
+  const queryBase = baseTitle(query);
+
+  const scored = results.map((item, index) => {
+    const normalizedName = normalizeTitle(item.name);
+    const itemBase = baseTitle(item.name);
+
+    return {
+      item,
+      index,
+      normalizedName,
+      itemBase,
+      score: scoreResult(query, item)
+    };
+  });
 
   scored.sort((a, b) => {
     if (b.score !== a.score) {
@@ -102,9 +114,6 @@ export function resolveMatch(query, results) {
 
   console.log("Scored matches:", JSON.stringify(scored, null, 2));
 
-  const top = scored[0];
-  const second = scored[1] || null;
-
   const shortlist = scored.slice(0, 5).map((entry) => ({
     id: entry.item.id,
     text: entry.item.text,
@@ -114,13 +123,53 @@ export function resolveMatch(query, results) {
     score: entry.score
   }));
 
-  const queryBase = baseTitle(query);
+  const top = scored[0];
+  const second = scored[1] || null;
+
+  const exactMatches = scored.filter(
+    (entry) => entry.normalizedName === normalizedQuery
+  );
+
+  if (exactMatches.length === 1) {
+    return {
+      mode: "selected",
+      selectedMatch: exactMatches[0].item,
+      matches: shortlist
+    };
+  }
+
+  if (exactMatches.length > 1) {
+    return {
+      mode: "disambiguation",
+      matches: shortlist
+    };
+  }
+
+  const containsQuery = scored.filter(
+    (entry) =>
+      entry.normalizedName.includes(normalizedQuery) ||
+      entry.itemBase.includes(normalizedQuery) ||
+      normalizedQuery.includes(entry.itemBase)
+  );
+
   const sameFamily = scored.filter(
-    (entry) => baseTitle(entry.item.name) === queryBase
+    (entry) =>
+      entry.itemBase === queryBase ||
+      entry.itemBase.includes(queryBase) ||
+      queryBase.includes(entry.itemBase)
   );
 
   const queryHasExplicitVariant =
-    normalizeTitle(query) !== queryBase;
+    normalizedQuery !== queryBase;
+
+  // If the user typed a family fragment like "addams" or "jurassic park"
+  // and several results belong to that family, force disambiguation.
+  if (!queryHasExplicitVariant && containsQuery.length >= 2) {
+    return {
+      mode: "disambiguation",
+      matches: shortlist
+    };
+  }
 
   if (!queryHasExplicitVariant && sameFamily.length >= 2) {
     return {
