@@ -15,24 +15,45 @@ export const handler = async (event) => {
     let body = {};
 
     if (event.body) {
-      body = typeof event.body === "string" ? JSON.parse(event.body) : event.body;
+      body =
+        typeof event.body === "string" ? JSON.parse(event.body) : event.body;
     } else {
       body = event;
     }
+
+    const searchQuery = event.queryStringParameters?.q;
 
     const machineName =
       body.machineName ||
       event.queryStringParameters?.name ||
       event.queryStringParameters?.machineName;
 
-    const machineId =
-      body.id ||
-      event.queryStringParameters?.id;
+    const machineId = body.id || event.queryStringParameters?.id;
 
-    if (!machineName && !machineId) {
-      return response(400, { error: "Missing machineName or id" });
+    if (!machineName && !machineId && !searchQuery) {
+      return response(400, { error: "Missing machineName, id, or q" });
     }
 
+    // Typeahead search
+    if (searchQuery) {
+      console.log("Typeahead search:", searchQuery);
+
+      const results = await opdbService(searchQuery);
+
+      const suggestions = results.slice(0, 10).map((item) => ({
+        id: item.id,
+        text: item.text,
+        name: item.name,
+        supplementary: item.supplementary,
+        display: item.display,
+      }));
+
+      return response(200, {
+        mode: "typeahead",
+        query: searchQuery,
+        suggestions,
+      });
+    }
     // Exact machine lookup by OPDB ID
     if (machineId) {
       console.log("Direct machine lookup by ID:", machineId);
@@ -42,7 +63,7 @@ export const handler = async (event) => {
 
       const supplementary = [
         machineDetails.manufacturer?.name,
-        machineDetails.manufacture_date?.slice(0, 4)
+        machineDetails.manufacture_date?.slice(0, 4),
       ]
         .filter(Boolean)
         .join(", ");
@@ -54,14 +75,17 @@ export const handler = async (event) => {
           text: machineDetails.name,
           name: machineDetails.name,
           supplementary: supplementary || null,
-          display: machineDetails.display || null
+          display: machineDetails.display || null,
         },
-        result: normalizedResult
+        result: normalizedResult,
       };
 
       // Cache exact machine selections by OPDB ID only
       await saveCachedMachine(`id:${machineDetails.opdb_id}`, payload);
-      console.log("Saved ID-based cache entry:", `id:${machineDetails.opdb_id}`);
+      console.log(
+        "Saved ID-based cache entry:",
+        `id:${machineDetails.opdb_id}`,
+      );
 
       return response(200, {
         mode: "result",
@@ -71,8 +95,8 @@ export const handler = async (event) => {
         result: payload.result,
         cache: {
           hit: false,
-          cachedAt: null
-        }
+          cachedAt: null,
+        },
       });
     }
 
@@ -82,7 +106,10 @@ export const handler = async (event) => {
     console.log("Cache miss. Searching OPDB for:", machineName);
 
     const primaryResults = await opdbService(machineName);
-    console.log("Primary OPDB results:", JSON.stringify(primaryResults, null, 2));
+    console.log(
+      "Primary OPDB results:",
+      JSON.stringify(primaryResults, null, 2),
+    );
 
     let results = [...primaryResults];
 
@@ -106,7 +133,7 @@ export const handler = async (event) => {
         mode: "not_found",
         error: "Machine not found",
         query: machineName,
-        matches: []
+        matches: [],
       });
     }
 
@@ -121,8 +148,8 @@ export const handler = async (event) => {
         matches: matchResolution.matches,
         cache: {
           hit: false,
-          cachedAt: null
-        }
+          cachedAt: null,
+        },
       });
     }
 
@@ -139,9 +166,9 @@ export const handler = async (event) => {
         text: bestMatch.text,
         name: bestMatch.name,
         supplementary: bestMatch.supplementary,
-        display: bestMatch.display
+        display: bestMatch.display,
       },
-      result: normalizedResult
+      result: normalizedResult,
     };
 
     const queryKey = normalizeCacheKey(machineName);
@@ -153,7 +180,7 @@ export const handler = async (event) => {
     } else {
       console.log(
         "Skipped caching broad query because selected machine differs:",
-        { machineName, selectedName: bestMatch.name }
+        { machineName, selectedName: bestMatch.name },
       );
     }
 
@@ -165,15 +192,15 @@ export const handler = async (event) => {
       result: payload.result,
       cache: {
         hit: false,
-        cachedAt: null
-      }
+        cachedAt: null,
+      },
     });
   } catch (error) {
     console.error("Handler error:", error);
 
     return response(500, {
       error: "Internal server error",
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -183,8 +210,8 @@ function response(statusCode, body) {
     statusCode,
     headers: {
       "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*"
+      "Access-Control-Allow-Origin": "*",
     },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
   };
 }
