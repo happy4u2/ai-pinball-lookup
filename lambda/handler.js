@@ -7,6 +7,7 @@ import { getMetadata, saveMetadata } from "./scripts/metadataService.js";
 import { createMetadataShell } from "./scripts/metadataMapper.js";
 import { mergeMachineData } from "./scripts/mergeMachineData.js";
 import { buildMachineId } from "./scripts/metadataKeys.js";
+import { discoverIpdbManuals } from "./scripts/ipdbManualService.js";
 
 function normalizeCacheKey(text) {
   return (text || "").trim().toLowerCase();
@@ -19,8 +20,39 @@ async function enrichWithMetadata(machine) {
 
   if (!metadata) {
     metadata = createMetadataShell(machine);
-    await saveMetadata(metadata);
+    metadata = await saveMetadata(metadata);
     console.log("Created metadata shell:", metadataMachineId);
+  }
+
+  const hasManuals =
+    Array.isArray(metadata.manuals) && metadata.manuals.length > 0;
+  const ipdbId =
+    metadata.references?.ipdbId || machine.ipdb_id || metadata.ipdbId || null;
+
+  if (!hasManuals && ipdbId) {
+    console.log("Attempting IPDB manual discovery for:", ipdbId);
+
+    const discovery = await discoverIpdbManuals(ipdbId);
+
+    metadata = {
+      ...metadata,
+      references: {
+        ...(metadata.references || {}),
+        ipdbId,
+        ipdbMachineUrl: discovery.ipdbMachineUrl,
+      },
+      manuals: discovery.manuals,
+      enrichment: {
+        ...(metadata.enrichment || {}),
+        manualsSource: "ipdb",
+        manualsFetchStatus: discovery.manualsFetchStatus,
+        manualsFetchedAt: discovery.manualsFetchedAt,
+      },
+    };
+
+    metadata = await saveMetadata(metadata);
+
+    console.log("IPDB manual discovery status:", discovery.manualsFetchStatus);
   }
 
   return mergeMachineData(machine, metadata);

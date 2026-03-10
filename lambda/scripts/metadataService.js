@@ -16,12 +16,20 @@ export async function getMetadata(machineId) {
 }
 
 export async function saveMetadata(record) {
+  const now = new Date().toISOString();
+
+  const item = {
+    ...record,
+    updatedAt: now,
+    createdAt: record.createdAt || now,
+  };
+
   await docClient.send(
     new PutCommand({
       TableName: TABLE_NAME,
-      Item: record,
+      Item: item,
     }),
   );
 
-  return record;
+  return item;
 }

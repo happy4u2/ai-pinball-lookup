@@ -1,9 +1,12 @@
 export function createMetadataShell(machine) {
   const now = new Date().toISOString();
 
+  const opdbId = machine.opdb_id || machine.id || null;
+  const ipdbId = machine.ipdb_id || null;
+
   return {
-    machineId: `opdb:${String(machine.opdb_id || machine.id).toLowerCase()}`,
-    opdbId: machine.opdb_id || machine.id || null,
+    machineId: `opdb:${String(opdbId).toLowerCase()}`,
+    opdbId,
 
     name: machine.name || null,
     normalizedName: (machine.name || "").trim().toLowerCase(),
@@ -16,6 +19,14 @@ export function createMetadataShell(machine) {
       players: machine.player_count || null,
       type: machine.type || null,
       features: Array.isArray(machine.features) ? machine.features : [],
+    },
+
+    references: {
+      opdbId,
+      ipdbId,
+      ipdbMachineUrl: ipdbId
+        ? `https://www.ipdb.org/machine.cgi?id=${ipdbId}`
+        : null,
     },
 
     aliases: [],
@@ -34,8 +45,14 @@ export function createMetadataShell(machine) {
       keywords: [],
     },
 
+    enrichment: {
+      manualsSource: null,
+      manualsFetchStatus: "not_attempted",
+      manualsFetchedAt: null,
+    },
+
     status: "active",
-    schemaVersion: 1,
+    schemaVersion: 2,
     createdAt: now,
     updatedAt: now,
   };
