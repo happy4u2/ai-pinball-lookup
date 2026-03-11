@@ -1,0 +1,26 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SwissPinballDynamoAccess",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:Scan",
+        "dynamodb:Query"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:eu-central-1:465443875879:table/pinball_machines",
+        "arn:aws:dynamodb:eu-central-1:465443875879:table/pinball_machines/index/*",
+        "arn:aws:dynamodb:eu-central-1:465443875879:table/pinball_machine_metadata",
+        "arn:aws:dynamodb:eu-central-1:465443875879:table/pinball_machine_metadata/index/*",
+        "arn:aws:dynamodb:eu-central-1:465443875879:table/pinball_customers",
+        "arn:aws:dynamodb:eu-central-1:465443875879:table/pinball_customers/index/*",
+        "arn:aws:dynamodb:eu-central-1:465443875879:table/pinball_machine_instances",
+        "arn:aws:dynamodb:eu-central-1:465443875879:table/pinball_machine_instances/index/*"
+      ]
+    }
+  ]
+}

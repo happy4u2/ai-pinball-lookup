@@ -1,3 +1,9 @@
 {
-  "body": "{\"machineName\":\"Corvette\"}"
+  "requestContext": {
+    "http": {
+      "method": "GET"
+    }
+  },
+  "rawPath": "/instances",
+  "queryStringParameters": {}
 }
