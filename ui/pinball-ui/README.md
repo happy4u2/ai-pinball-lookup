@@ -1,5 +1,17 @@
 # AI Pinball Lookup — SwissPinball Backend
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [API Routes](#api-routes)
+- [Machine Lookup Flow](#machine-lookup-flow)
+- [Caching Strategy](#caching-strategy)
+- [Metadata Enrichment](#metadata-enrichment)
+- [Customer API](#customer-api)
+- [Development](#development)
+- [Deployment](#deployment)
+
 Serverless backend powering the **SwissPinball machine intelligence and service platform**.
 
 This system provides:

@@ -1,5 +1,17 @@
 # AI Pinball Lookup
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [API Routes](#api-routes)
+- [Machine Lookup Flow](#machine-lookup-flow)
+- [Caching Strategy](#caching-strategy)
+- [Metadata Enrichment](#metadata-enrichment)
+- [Customer API](#customer-api)
+- [Development](#development)
+- [Deployment](#deployment)
+
 Serverless pinball machine lookup and technical knowledge API built on AWS.
 
 This project provides intelligent machine identification, variant disambiguation, and structured pinball machine data powered by the **Open Pinball Database (OPDB)** and enhanced with **SwissPinball technical metadata stored in DynamoDB**.
