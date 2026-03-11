@@ -13,10 +13,9 @@ function normalizePhone(phone = "") {
 
   if (!value) return "";
 
-  // remove spaces, dashes, brackets
   let cleaned = value.replace(/[^\d+]/g, "");
 
-  // Swiss local mobile/home format: 0792108272 -> +41792108272
+  // Swiss local format: 0792108272 -> +41792108272
   if (cleaned.startsWith("0")) {
     cleaned = "+41" + cleaned.slice(1);
   }
@@ -45,6 +44,7 @@ export async function createCustomer(data) {
   const customerId = `cust:${crypto.randomUUID()}`;
 
   const phone = normalizePhone(data.phone || "");
+
   const customer = {
     customerId,
     name: cleanText(data.name),
@@ -108,13 +108,13 @@ export async function updateCustomer(customerId, updates) {
 
   const updatedCustomer = {
     ...existing,
-    ...(updates.name !== undefined && { name: cleanText(updates.name) }),
-    ...(updates.phone !== undefined && { phone: nextPhone }),
-    ...(updates.email !== undefined && { email: cleanText(updates.email) }),
-    ...(updates.address !== undefined && {
-      address: cleanText(updates.address),
-    }),
-    ...(updates.notes !== undefined && { notes: cleanText(updates.notes) }),
+    ...(updates.name !== undefined ? { name: cleanText(updates.name) } : {}),
+    ...(updates.phone !== undefined ? { phone: nextPhone } : {}),
+    ...(updates.email !== undefined ? { email: cleanText(updates.email) } : {}),
+    ...(updates.address !== undefined
+      ? { address: cleanText(updates.address) }
+      : {}),
+    ...(updates.notes !== undefined ? { notes: cleanText(updates.notes) } : {}),
     whatsapp: buildWhatsAppLink(nextPhone),
     updatedAt: nowIso(),
   };
