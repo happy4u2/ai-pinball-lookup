@@ -12,6 +12,7 @@ Responsibilities:
 3. IPDB manual discovery
 4. Cache management
 5. Customer CRUD API
+6. Machine instance tracking
 
 Architecture flow:
 
@@ -23,7 +24,7 @@ Lambda handler
   ↓
 Route dispatcher
   ↓
-Services (OPDB / metadata / cache / customer)
+Services (OPDB / metadata / cache / customer / instances)
 
 ========================================================
 */
@@ -34,6 +35,14 @@ Service Imports
 Each service encapsulates a specific responsibility.
 ========================================================
 */
+import {
+  createInstance,
+  getInstance,
+  listInstances,
+  listInstancesByCustomer,
+  listInstancesByMachine,
+  updateInstance,
+} from "./scripts/instanceService.js";
 
 // OPDB search service (typeahead)
 import { opdbService } from "./scripts/opdbService.js";
@@ -232,7 +241,6 @@ export const handler = async (event) => {
     Parse request body.
     API Gateway may send body as JSON string.
     */
-
     let body = {};
 
     if (event.body) {
@@ -245,7 +253,6 @@ export const handler = async (event) => {
     /*
     Determine request context.
     */
-
     const httpMethod =
       event.requestContext?.http?.method || event.httpMethod || "GET";
 
@@ -331,6 +338,101 @@ export const handler = async (event) => {
 
     /*
     ==================================================
+    MACHINE INSTANCES ROUTES
+    ==================================================
+    */
+
+    /*
+    POST /instances
+    Create machine instance
+    */
+    if (httpMethod === "POST" && path === "/instances") {
+      const instance = await createInstance(body);
+
+      return response(201, {
+        ok: true,
+        instance,
+      });
+    }
+
+    /*
+    GET /instances
+    List all instances
+    Optional filters:
+    - customerId
+    - machineId
+    */
+    if (httpMethod === "GET" && path === "/instances") {
+      const customerId = event.queryStringParameters?.customerId;
+      const machineId = event.queryStringParameters?.machineId;
+
+      let items;
+
+      if (customerId) {
+        items = await listInstancesByCustomer(customerId);
+      } else if (machineId) {
+        items = await listInstancesByMachine(machineId);
+      } else {
+        items = await listInstances();
+      }
+
+      return response(200, {
+        ok: true,
+        count: items.length,
+        items,
+      });
+    }
+
+    /*
+    GET /instances/{id}
+    Retrieve single machine instance
+    */
+    if (httpMethod === "GET" && path.startsWith("/instances/")) {
+      const instanceId = getPathId(path, "/instances");
+
+      if (!instanceId) {
+        return response(400, { error: "Missing instanceId" });
+      }
+
+      const instance = await getInstance(instanceId);
+
+      if (!instance) {
+        return response(404, {
+          error: "Instance not found",
+        });
+      }
+
+      return response(200, {
+        ok: true,
+        instance,
+      });
+    }
+
+    /*
+    PUT /instances/{id}
+    Update machine instance
+    */
+    if (httpMethod === "PUT" && path.startsWith("/instances/")) {
+      const instanceId = getPathId(path, "/instances");
+
+      if (!instanceId) {
+        return response(400, { error: "Missing instanceId" });
+      }
+
+      const instance = await updateInstance(instanceId, body);
+
+      if (!instance) {
+        return response(404, { error: "Instance not found" });
+      }
+
+      return response(200, {
+        ok: true,
+        instance,
+      });
+    }
+
+    /*
+    ==================================================
     MACHINE METADATA UPDATE
     ==================================================
     */
@@ -383,7 +485,6 @@ export const handler = async (event) => {
       /*
       Machine lookup parameters
       */
-
       const machineName =
         body.machineName ||
         event.queryStringParameters?.name ||
@@ -394,7 +495,6 @@ export const handler = async (event) => {
       /*
       Validate request
       */
-
       if (!machineName && !machineId && !searchQuery) {
         return response(400, { error: "Missing machineName, id, or q" });
       }
@@ -404,7 +504,6 @@ export const handler = async (event) => {
       TYPEAHEAD SEARCH
       ------------------------------------------------
       */
-
       if (searchQuery) {
         console.log("Typeahead search:", searchQuery);
 
@@ -430,7 +529,6 @@ export const handler = async (event) => {
       MACHINE LOOKUP BY ID
       ------------------------------------------------
       */
-
       if (machineId) {
         const idCacheKey = `id:${machineId}`;
 
@@ -462,7 +560,6 @@ export const handler = async (event) => {
         /*
         Cache miss → call OPDB
         */
-
         console.log("Direct machine lookup by ID:", machineId);
 
         const machineDetails = await opdbDetailService(machineId);
@@ -474,7 +571,6 @@ export const handler = async (event) => {
         /*
         Save result to cache
         */
-
         const payload = {
           source: "opdb-machine",
           query: machineDetails.name,
@@ -513,7 +609,6 @@ export const handler = async (event) => {
       EXACT NAME CACHE LOOKUP
       ------------------------------------------------
       */
-
       const nameCacheKey = `name:${normalizeCacheKey(machineName)}`;
 
       console.log("Checking exact-name cache for:", nameCacheKey);
@@ -543,7 +638,6 @@ export const handler = async (event) => {
       SEARCH OPDB
       ------------------------------------------------
       */
-
       console.log("Cache miss. Searching OPDB for:", machineName);
 
       const primaryResults = await opdbService(machineName);
@@ -558,7 +652,6 @@ export const handler = async (event) => {
 
       This performs a secondary search.
       */
-
       let results = [...primaryResults];
 
       if (!machineName.toLowerCase().startsWith("the ")) {
@@ -578,7 +671,6 @@ export const handler = async (event) => {
       /*
       No matches
       */
-
       if (!results.length) {
         return response(404, {
           mode: "not_found",
@@ -591,13 +683,11 @@ export const handler = async (event) => {
       /*
       Resolve best match
       */
-
       const matchResolution = resolveMatch(machineName, results);
 
       /*
       If ambiguous → return choices
       */
-
       if (matchResolution.mode === "disambiguation") {
         console.log("Disambiguation required for:", machineName);
 
@@ -615,13 +705,11 @@ export const handler = async (event) => {
       /*
       Best match found
       */
-
       const bestMatch = matchResolution.selectedMatch;
 
       /*
       Reuse ID cache if possible
       */
-
       const idCacheKey = `id:${bestMatch.id}`;
 
       const cached = await getCachedMachine(idCacheKey);
@@ -647,7 +735,6 @@ export const handler = async (event) => {
       /*
       Fetch machine details
       */
-
       const machineDetails = await opdbDetailService(bestMatch.id);
 
       const normalizedResult = normalizeMachine(machineDetails);
@@ -657,7 +744,6 @@ export const handler = async (event) => {
       /*
       Save to cache
       */
-
       const payload = {
         source: "opdb-machine",
         query: bestMatch.name,
@@ -693,7 +779,6 @@ export const handler = async (event) => {
     ROUTE NOT FOUND
     ------------------------------------------------
     */
-
     return response(404, {
       error: "Route not found",
       method: httpMethod,
