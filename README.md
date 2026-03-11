@@ -1,17 +1,5 @@
 # AI Pinball Lookup
 
-## Table of Contents -dave
-
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [API Routes](#api-routes)
-- [Machine Lookup Flow](#machine-lookup-flow)
-- [Caching Strategy](#caching-strategy)
-- [Metadata Enrichment](#metadata-enrichment)
-- [Customer API](#customer-api)
-- [Development](#development)
-- [Deployment](#deployment)
-
 Serverless pinball machine lookup and technical knowledge API built on AWS.
 
 This project provides intelligent machine identification, variant disambiguation, and structured pinball machine data powered by the **Open Pinball Database (OPDB)** and enhanced with **SwissPinball technical metadata stored in DynamoDB**.
@@ -20,7 +8,55 @@ The system is designed to evolve into a **machine intelligence platform for tech
 
 ---
 
-# Project Goals
+## Table of Contents
+
+- [Overview](#overview)
+- [Project Goals](#project-goals)
+- [Architecture](#architecture)
+- [Core Data Sources](#core-data-sources)
+- [API Endpoint](#api-endpoint)
+- [API Usage](#api-usage)
+  - [Typeahead Search](#typeahead-search)
+  - [Machine Lookup by Name](#machine-lookup-by-name)
+  - [Machine Lookup by OPDB ID](#machine-lookup-by-opdb-id)
+  - [Update Machine Metadata](#update-machine-metadata)
+- [Backend Structure](#backend-structure)
+- [DynamoDB Tables](#dynamodb-tables)
+  - [Machine Cache](#machine-cache)
+  - [Machine Metadata](#machine-metadata)
+- [Machine Metadata Model](#machine-metadata-model)
+- [Cache Strategy](#cache-strategy)
+- [Match Resolution System](#match-resolution-system)
+- [Example Machine Families](#example-machine-families)
+- [Manual Discovery System](#manual-discovery-system-planned)
+- [AI Technology Stack](#ai-technology-stack)
+- [Frontend](#frontend)
+- [Technologies](#technologies)
+- [Current Project Phase](#current-project-phase)
+- [Upcoming Phases](#upcoming-phases)
+- [Future Capabilities](#future-capabilities)
+- [Repository](#repository)
+- [Vision](#vision)
+
+---
+
+## Overview
+
+AI Pinball Lookup is a serverless backend for identifying pinball machines, resolving machine variants, and storing structured technical metadata.
+
+It combines:
+
+- **OPDB** for authoritative machine reference data
+- **DynamoDB** for persistent SwissPinball machine metadata
+- **AWS Lambda** for API execution
+- **API Gateway** for public access
+- **Amazon Bedrock** for future AI enrichment workflows
+
+The long-term aim is to create a practical machine knowledge system for technicians, collectors, and service operations.
+
+---
+
+## Project Goals
 
 The long-term goal is to build a **pinball machine intelligence system**.
 
@@ -36,7 +72,7 @@ The system should be able to:
 
 ---
 
-# Architecture
+## Architecture
 
 ```
 User
@@ -61,9 +97,9 @@ AWS Lambda (Node.js 24)
 
 ---
 
-# Core Data Sources
+## Core Data Sources
 
-## OPDB (Open Pinball Database)
+### OPDB (Open Pinball Database)
 
 Primary machine reference source.
 
@@ -76,9 +112,7 @@ Provides:
 - player count
 - IPDB reference
 
----
-
-## SwissPinball Metadata
+### SwissPinball Metadata
 
 Stored in DynamoDB.
 
@@ -95,7 +129,7 @@ This becomes the **persistent machine knowledge layer**.
 
 ---
 
-# API Endpoint
+## API Endpoint
 
 Base URL
 
@@ -105,9 +139,9 @@ https://cp114tpb2i.execute-api.eu-central-1.amazonaws.com/prod
 
 ---
 
-# API Usage
+## API Usage
 
-## Typeahead Search
+### Typeahead Search
 
 Returns machine suggestions while typing.
 
@@ -134,7 +168,7 @@ Example response
 
 ---
 
-## Machine Lookup by Name
+### Machine Lookup by Name
 
 ```
 GET /machine?name=Twilight%20Zone
@@ -142,7 +176,7 @@ GET /machine?name=Twilight%20Zone
 
 Possible responses:
 
-### Result
+#### Result
 
 ```json
 {
@@ -157,9 +191,7 @@ Possible responses:
 }
 ```
 
----
-
-### Disambiguation
+#### Disambiguation
 
 Returned when multiple machine variants exist.
 
@@ -182,7 +214,7 @@ Returned when multiple machine variants exist.
 
 ---
 
-## Machine Lookup by OPDB ID
+### Machine Lookup by OPDB ID
 
 ```
 GET /machine?id=GrXzD-MjBPX
@@ -190,7 +222,7 @@ GET /machine?id=GrXzD-MjBPX
 
 ---
 
-## Update Machine Metadata
+### Update Machine Metadata
 
 ```
 POST /machine
@@ -221,7 +253,7 @@ Example response
 
 ---
 
-# Backend Structure
+## Backend Structure
 
 ```
 lambda/
@@ -246,9 +278,9 @@ lambda/
 
 ---
 
-# DynamoDB Tables
+## DynamoDB Tables
 
-## Machine Cache
+### Machine Cache
 
 ```
 pinball_machines
@@ -269,9 +301,7 @@ id:G4ZVB-MJ5lE
 name:twilight zone
 ```
 
----
-
-## Machine Metadata
+### Machine Metadata
 
 ```
 pinball_machine_metadata
@@ -293,42 +323,34 @@ opdb:grxzd-mjbpx
 
 ---
 
-# Machine Metadata Model
+## Machine Metadata Model
 
 Example record
 
 ```json
 {
   "machineId": "opdb:grxzd-mjbpx",
-
   "name": "Twilight Zone",
   "manufacturer": "Bally",
   "normalizedName": "twilight zone",
-
   "references": {
     "opdbId": "GrXzD-MjBPX",
     "ipdbId": 2684,
     "ipdbMachineUrl": "https://www.ipdb.org/machine.cgi?id=2684"
   },
-
   "manuals": [],
   "manualCandidates": [],
-
   "commonIssues": [],
   "repairNotes": [],
   "parts": [],
-
   "serviceTags": [],
-
   "content": {
     "shortDescription": "",
     "longDescription": "",
     "keywords": []
   },
-
   "status": "active",
   "schemaVersion": 2,
-
   "createdAt": "",
   "updatedAt": ""
 }
@@ -336,7 +358,7 @@ Example record
 
 ---
 
-# Cache Strategy
+## Cache Strategy
 
 | Query Type        | Cached |
 | ----------------- | ------ |
@@ -349,7 +371,7 @@ This prevents disambiguation results from being cached incorrectly.
 
 ---
 
-# Match Resolution System
+## Match Resolution System
 
 The resolver determines whether to:
 
@@ -367,7 +389,7 @@ Scoring factors include:
 
 ---
 
-# Example Machine Families
+## Example Machine Families
 
 ```
 Addams Family
@@ -385,37 +407,19 @@ Jurassic Park
 
 ---
 
-# Manual Discovery System (Planned)
+## Manual Discovery System (Planned)
 
 The system will support **automatic manual discovery and AI-assisted classification**.
 
 Manual ingestion follows three stages:
 
-1. **Discovery**
-
-Candidate manual links gathered from sources such as:
-
-- IPDB
-- manufacturer documentation
-- curated document repositories
-
-2. **AI Classification**
-
-Candidates analyzed using **Amazon Bedrock**.
-
-AI determines:
-
-- document type
-- relevance
-- confidence score
-
-3. **Verification**
-
-Approved manuals are stored in the `manuals` list.
+1. Discovery
+2. AI Classification
+3. Verification
 
 ---
 
-# AI Technology Stack
+## AI Technology Stack
 
 ```
 AI Platform: Amazon Bedrock
@@ -425,18 +429,9 @@ Runtime: AWS Lambda Node.js
 Storage: DynamoDB
 ```
 
-AI will assist with:
-
-- document classification
-- manual summarization
-- duplicate detection
-- repair knowledge extraction
-
 ---
 
-# Frontend
-
-Built with
+## Frontend
 
 ```
 React
@@ -459,7 +454,7 @@ http://localhost:5173
 
 ---
 
-# Technologies
+## Technologies
 
 Backend
 
@@ -482,17 +477,15 @@ TailwindCSS
 External Data
 
 ```
-OPDB (Open Pinball Database)
-IPDB (Internet Pinball Database)
+OPDB
+IPDB
 ```
 
 ---
 
-# Current Project Phase
+## Current Project Phase
 
 **Phase 12**
-
-Machine metadata editing API
 
 Working features
 
@@ -502,12 +495,12 @@ Working features
 - disambiguation system
 - DynamoDB caching
 - persistent machine metadata
-- machine metadata editing via API
+- machine metadata editing API
 - IPDB reference integration
 
 ---
 
-# Upcoming Phases
+## Upcoming Phases
 
 Phase 13  
 Customer database
@@ -523,9 +516,7 @@ AI technician assistant
 
 ---
 
-# Future Capabilities
-
-Example
+## Future Capabilities
 
 Machine
 
@@ -551,9 +542,7 @@ repair procedures
 
 ---
 
-# Repository
-
-GitHub repository
+## Repository
 
 ```
 ai-pinball-lookup
@@ -567,7 +556,7 @@ SwissPinball
 
 ---
 
-# Vision
+## Vision
 
 The long-term goal is to build the **most useful pinball machine knowledge system for technicians and collectors**, combining:
 
