@@ -13,12 +13,21 @@ import {
   createCustomer,
   getCustomer,
   listCustomers,
+  updateCustomer,
 } from "./scripts/customerService.js";
 
 function normalizeCacheKey(text) {
   return (text || "").trim().toLowerCase();
 }
 
+function normalizePath(path = "") {
+  return path.replace(/^\/prod/, "") || "/";
+}
+
+function getPathId(path, baseRoute) {
+  if (!path.startsWith(baseRoute + "/")) return null;
+  return decodeURIComponent(path.slice(baseRoute.length + 1));
+}
 async function enrichWithMetadata(machine) {
   const metadataMachineId = buildMachineId(machine.opdb_id || machine.id);
 
@@ -116,34 +125,13 @@ export const handler = async (event) => {
         updatedMetadata: metadata,
       });
     }
-    // POST /customers
-    if (httpMethod === "POST" && path === "/customers") {
-      const customer = await createCustomer(body);
-      return response(200, {
-        ok: true,
-        customer,
-      });
-    }
-    // GET /customers
-    if (httpMethod === "GET" && path === "/customers") {
-      const customers = await listCustomers();
-
-      return response(200, {
-        ok: true,
-        customers,
-      });
+    function normalizePath(path = "") {
+      return path.replace(/^\/prod/, "") || "/";
     }
 
-    // GET /customers/{id}
-    if (httpMethod === "GET" && path.startsWith("/customers/")) {
-      const customerId = path.split("/")[2];
-
-      const customer = await getCustomer(customerId);
-
-      return response(200, {
-        ok: true,
-        customer,
-      });
+    function getPathId(path, baseRoute) {
+      if (!path.startsWith(baseRoute + "/")) return null;
+      return decodeURIComponent(path.slice(baseRoute.length + 1));
     }
 
     const machineName =
