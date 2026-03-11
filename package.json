@@ -1,6 +1,17 @@
 {
+  "name": "ai-pinball-lookup",
+  "version": "1.0.0",
   "type": "module",
+  "description": "SwissPinball AI backend Lambda service",
+  "main": "lambda/handler.js",
+  "scripts": {
+    "check": "node --check lambda/handler.js",
+    "check:services": "for %f in (lambda\\scripts\\*.js) do node --check %f",
+    "check:all": "npm run check && npm run check:services"
+  },
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.600.0",
+    "@aws-sdk/lib-dynamodb": "^3.600.0",
     "dotenv": "^17.3.1"
   }
 }
