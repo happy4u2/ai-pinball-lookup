@@ -21,13 +21,14 @@ function normalizeCacheKey(text) {
 }
 
 function normalizePath(path = "") {
-  return path.replace(/^\/prod/, "") || "/";
+  return path.replace(/^\/prod(?=\/|$)/, "") || "/";
 }
 
 function getPathId(path, baseRoute) {
   if (!path.startsWith(baseRoute + "/")) return null;
   return decodeURIComponent(path.slice(baseRoute.length + 1));
 }
+
 async function enrichWithMetadata(machine) {
   const metadataMachineId = buildMachineId(machine.opdb_id || machine.id);
 
@@ -85,20 +86,77 @@ export const handler = async (event) => {
     } else {
       body = event;
     }
+
     const httpMethod =
       event.requestContext?.http?.method || event.httpMethod || "GET";
     const action = body.action || null;
     const rawPath =
       event.rawPath || event.requestContext?.http?.path || event.path || "/";
-
-    const path = rawPath.replace(/^\/prod(?=\/|$)/, "") || "/";
+    const path = normalizePath(rawPath);
     const searchQuery = event.queryStringParameters?.q;
 
-    // DEBUG
     console.log("ROUTE DEBUG:", { httpMethod, rawPath, path });
 
-    // POST /machine metadata update
-    if (httpMethod === "POST" && action === "updateMetadata") {
+    // --------------------------------------------------
+    // CUSTOMER ROUTES
+    // --------------------------------------------------
+
+    if (httpMethod === "POST" && path === "/customers") {
+      const result = await createCustomer(body);
+      return response(201, result);
+    }
+
+    if (httpMethod === "GET" && path === "/customers") {
+      const result = await listCustomers();
+      return response(200, result);
+    }
+
+    if (httpMethod === "GET" && path.startsWith("/customers/")) {
+      const customerId = getPathId(path, "/customers");
+
+      if (!customerId) {
+        return response(400, { error: "Missing customerId" });
+      }
+
+      const result = await getCustomer(customerId);
+
+      if (!result) {
+        return response(404, { error: "Customer not found" });
+      }
+
+      return response(200, {
+        ok: true,
+        customer: result,
+      });
+    }
+
+    if (httpMethod === "PUT" && path.startsWith("/customers/")) {
+      const customerId = getPathId(path, "/customers");
+
+      if (!customerId) {
+        return response(400, { error: "Missing customerId" });
+      }
+
+      console.log("Updating customer:", { customerId, body });
+
+      const result = await updateCustomer(customerId, body);
+
+      if (!result) {
+        return response(404, { error: "Customer not found" });
+      }
+
+      return response(200, result);
+    }
+
+    // --------------------------------------------------
+    // MACHINE METADATA UPDATE ROUTE
+    // --------------------------------------------------
+
+    if (
+      httpMethod === "POST" &&
+      path === "/machine" &&
+      action === "updateMetadata"
+    ) {
       const metadataMachineId = body.machineId;
 
       if (!metadataMachineId) {
@@ -125,63 +183,201 @@ export const handler = async (event) => {
         updatedMetadata: metadata,
       });
     }
-    function normalizePath(path = "") {
-      return path.replace(/^\/prod/, "") || "/";
-    }
 
-    function getPathId(path, baseRoute) {
-      if (!path.startsWith(baseRoute + "/")) return null;
-      return decodeURIComponent(path.slice(baseRoute.length + 1));
-    }
+    // --------------------------------------------------
+    // MACHINE ROUTES
+    // --------------------------------------------------
 
-    const machineName =
-      body.machineName ||
-      event.queryStringParameters?.name ||
-      event.queryStringParameters?.machineName;
+    if (path === "/machine") {
+      const machineName =
+        body.machineName ||
+        event.queryStringParameters?.name ||
+        event.queryStringParameters?.machineName;
 
-    const machineId = body.id || event.queryStringParameters?.id;
+      const machineId = body.id || event.queryStringParameters?.id;
 
-    if (!machineName && !machineId && !searchQuery) {
-      return response(400, { error: "Missing machineName, id, or q" });
-    }
+      if (!machineName && !machineId && !searchQuery) {
+        return response(400, { error: "Missing machineName, id, or q" });
+      }
 
-    // Typeahead search
-    if (searchQuery) {
-      console.log("Typeahead search:", searchQuery);
+      // Typeahead search
+      if (searchQuery) {
+        console.log("Typeahead search:", searchQuery);
 
-      const results = await opdbService(searchQuery);
+        const results = await opdbService(searchQuery);
 
-      const suggestions = results.slice(0, 10).map((item) => ({
-        id: item.id,
-        text: item.text,
-        name: item.name,
-        supplementary: item.supplementary,
-        display: item.display,
-      }));
+        const suggestions = results.slice(0, 10).map((item) => ({
+          id: item.id,
+          text: item.text,
+          name: item.name,
+          supplementary: item.supplementary,
+          display: item.display,
+        }));
 
-      return response(200, {
-        mode: "typeahead",
-        query: searchQuery,
-        suggestions,
-      });
-    }
+        return response(200, {
+          mode: "typeahead",
+          query: searchQuery,
+          suggestions,
+        });
+      }
 
-    // Exact machine lookup by OPDB ID
-    if (machineId) {
-      const idCacheKey = `id:${machineId}`;
-      console.log("Checking ID cache for:", idCacheKey);
+      // Exact machine lookup by OPDB ID
+      if (machineId) {
+        const idCacheKey = `id:${machineId}`;
+        console.log("Checking ID cache for:", idCacheKey);
 
+        const cached = await getCachedMachine(idCacheKey);
+
+        if (cached) {
+          console.log("ID cache hit for:", idCacheKey);
+
+          const enrichedMachine = await enrichWithMetadata(cached.result);
+
+          return response(200, {
+            mode: "result",
+            source: cached.source,
+            query: cached.query,
+            selectedMatch: cached.selectedMatch,
+            result: enrichedMachine,
+            cache: {
+              hit: true,
+              cachedAt: cached.cachedAt,
+            },
+          });
+        }
+
+        console.log("Direct machine lookup by ID:", machineId);
+
+        const machineDetails = await opdbDetailService(machineId);
+        const normalizedResult = normalizeMachine(machineDetails);
+        const enrichedMachine = await enrichWithMetadata(normalizedResult);
+
+        const supplementary = [
+          machineDetails.manufacturer?.name,
+          machineDetails.manufacture_date?.slice(0, 4),
+        ]
+          .filter(Boolean)
+          .join(", ");
+
+        const payload = {
+          source: "opdb-machine",
+          query: machineDetails.name,
+          selectedMatch: {
+            id: machineDetails.opdb_id,
+            text: machineDetails.name,
+            name: machineDetails.name,
+            supplementary: supplementary || null,
+            display: machineDetails.display || null,
+          },
+          result: enrichedMachine,
+        };
+
+        await saveCachedMachine(`id:${machineDetails.opdb_id}`, payload);
+        console.log(
+          "Saved ID-based cache entry:",
+          `id:${machineDetails.opdb_id}`,
+        );
+
+        return response(200, {
+          mode: "result",
+          source: payload.source,
+          query: machineDetails.name,
+          selectedMatch: payload.selectedMatch,
+          result: payload.result,
+          cache: {
+            hit: false,
+            cachedAt: null,
+          },
+        });
+      }
+
+      // Safe exact-name cache read only
+      const nameCacheKey = `name:${normalizeCacheKey(machineName)}`;
+      console.log("Checking exact-name cache for:", nameCacheKey);
+
+      const cachedByName = await getCachedMachine(nameCacheKey);
+
+      if (cachedByName) {
+        console.log("Exact-name cache hit for:", nameCacheKey);
+
+        const enrichedMachine = await enrichWithMetadata(cachedByName.result);
+
+        return response(200, {
+          mode: "result",
+          source: cachedByName.source,
+          query: cachedByName.query,
+          selectedMatch: cachedByName.selectedMatch,
+          result: enrichedMachine,
+          cache: {
+            hit: true,
+            cachedAt: cachedByName.cachedAt,
+          },
+        });
+      }
+
+      console.log("Cache miss. Searching OPDB for:", machineName);
+
+      const primaryResults = await opdbService(machineName);
+      console.log(
+        "Primary OPDB results:",
+        JSON.stringify(primaryResults, null, 2),
+      );
+
+      let results = [...primaryResults];
+
+      if (!machineName.toLowerCase().startsWith("the ")) {
+        const altQuery = `The ${machineName}`;
+        const altResults = await opdbService(altQuery);
+
+        const seen = new Set(results.map((r) => r.id));
+        for (const item of altResults) {
+          if (!seen.has(item.id)) {
+            results.push(item);
+            seen.add(item.id);
+          }
+        }
+      }
+
+      console.log("Combined OPDB results:", JSON.stringify(results, null, 2));
+
+      if (!results.length) {
+        return response(404, {
+          mode: "not_found",
+          error: "Machine not found",
+          query: machineName,
+          matches: [],
+        });
+      }
+
+      const matchResolution = resolveMatch(machineName, results);
+
+      if (matchResolution.mode === "disambiguation") {
+        console.log("Disambiguation required for:", machineName);
+
+        return response(200, {
+          mode: "disambiguation",
+          query: machineName,
+          matches: matchResolution.matches,
+          cache: {
+            hit: false,
+            cachedAt: null,
+          },
+        });
+      }
+
+      const bestMatch = matchResolution.selectedMatch;
+      const idCacheKey = `id:${bestMatch.id}`;
       const cached = await getCachedMachine(idCacheKey);
 
       if (cached) {
-        console.log("ID cache hit for:", idCacheKey);
+        console.log("Reusing ID cache for:", idCacheKey);
 
         const enrichedMachine = await enrichWithMetadata(cached.result);
 
         return response(200, {
           mode: "result",
           source: cached.source,
-          query: cached.query,
+          query: machineName,
           selectedMatch: cached.selectedMatch,
           result: enrichedMachine,
           cache: {
@@ -191,42 +387,37 @@ export const handler = async (event) => {
         });
       }
 
-      console.log("Direct machine lookup by ID:", machineId);
+      console.log("Selected OPDB match:", bestMatch);
 
-      const machineDetails = await opdbDetailService(machineId);
+      const machineDetails = await opdbDetailService(bestMatch.id);
       const normalizedResult = normalizeMachine(machineDetails);
       const enrichedMachine = await enrichWithMetadata(normalizedResult);
 
-      const supplementary = [
-        machineDetails.manufacturer?.name,
-        machineDetails.manufacture_date?.slice(0, 4),
-      ]
-        .filter(Boolean)
-        .join(", ");
-
       const payload = {
         source: "opdb-machine",
-        query: machineDetails.name,
+        query: bestMatch.name,
         selectedMatch: {
-          id: machineDetails.opdb_id,
-          text: machineDetails.name,
-          name: machineDetails.name,
-          supplementary: supplementary || null,
-          display: machineDetails.display || null,
+          id: bestMatch.id,
+          text: bestMatch.text,
+          name: bestMatch.name,
+          supplementary: bestMatch.supplementary,
+          display: bestMatch.display,
         },
         result: enrichedMachine,
       };
 
-      await saveCachedMachine(`id:${machineDetails.opdb_id}`, payload);
-      console.log(
-        "Saved ID-based cache entry:",
-        `id:${machineDetails.opdb_id}`,
-      );
+      await saveCachedMachine(`id:${bestMatch.id}`, payload);
+      console.log("Saved resolved ID cache entry:", `id:${bestMatch.id}`);
+
+      console.log("Skipping exact-name cache write:", {
+        machineName,
+        selectedName: bestMatch.name,
+      });
 
       return response(200, {
         mode: "result",
         source: payload.source,
-        query: machineDetails.name,
+        query: machineName,
         selectedMatch: payload.selectedMatch,
         result: payload.result,
         cache: {
@@ -236,139 +427,11 @@ export const handler = async (event) => {
       });
     }
 
-    // Safe exact-name cache read only
-    const nameCacheKey = `name:${normalizeCacheKey(machineName)}`;
-    console.log("Checking exact-name cache for:", nameCacheKey);
-
-    const cachedByName = await getCachedMachine(nameCacheKey);
-
-    if (cachedByName) {
-      console.log("Exact-name cache hit for:", nameCacheKey);
-
-      const enrichedMachine = await enrichWithMetadata(cachedByName.result);
-
-      return response(200, {
-        mode: "result",
-        source: cachedByName.source,
-        query: cachedByName.query,
-        selectedMatch: cachedByName.selectedMatch,
-        result: enrichedMachine,
-        cache: {
-          hit: true,
-          cachedAt: cachedByName.cachedAt,
-        },
-      });
-    }
-
-    console.log("Cache miss. Searching OPDB for:", machineName);
-
-    const primaryResults = await opdbService(machineName);
-    console.log(
-      "Primary OPDB results:",
-      JSON.stringify(primaryResults, null, 2),
-    );
-
-    let results = [...primaryResults];
-
-    if (!machineName.toLowerCase().startsWith("the ")) {
-      const altQuery = `The ${machineName}`;
-      const altResults = await opdbService(altQuery);
-
-      const seen = new Set(results.map((r) => r.id));
-      for (const item of altResults) {
-        if (!seen.has(item.id)) {
-          results.push(item);
-          seen.add(item.id);
-        }
-      }
-    }
-
-    console.log("Combined OPDB results:", JSON.stringify(results, null, 2));
-
-    if (!results.length) {
-      return response(404, {
-        mode: "not_found",
-        error: "Machine not found",
-        query: machineName,
-        matches: [],
-      });
-    }
-
-    const matchResolution = resolveMatch(machineName, results);
-
-    if (matchResolution.mode === "disambiguation") {
-      console.log("Disambiguation required for:", machineName);
-
-      return response(200, {
-        mode: "disambiguation",
-        query: machineName,
-        matches: matchResolution.matches,
-        cache: {
-          hit: false,
-          cachedAt: null,
-        },
-      });
-    }
-
-    const bestMatch = matchResolution.selectedMatch;
-    const idCacheKey = `id:${bestMatch.id}`;
-    const cached = await getCachedMachine(idCacheKey);
-
-    if (cached) {
-      console.log("Reusing ID cache for:", idCacheKey);
-
-      const enrichedMachine = await enrichWithMetadata(cached.result);
-
-      return response(200, {
-        mode: "result",
-        source: cached.source,
-        query: machineName,
-        selectedMatch: cached.selectedMatch,
-        result: enrichedMachine,
-        cache: {
-          hit: true,
-          cachedAt: cached.cachedAt,
-        },
-      });
-    }
-
-    console.log("Selected OPDB match:", bestMatch);
-
-    const machineDetails = await opdbDetailService(bestMatch.id);
-    const normalizedResult = normalizeMachine(machineDetails);
-    const enrichedMachine = await enrichWithMetadata(normalizedResult);
-
-    const payload = {
-      source: "opdb-machine",
-      query: bestMatch.name,
-      selectedMatch: {
-        id: bestMatch.id,
-        text: bestMatch.text,
-        name: bestMatch.name,
-        supplementary: bestMatch.supplementary,
-        display: bestMatch.display,
-      },
-      result: enrichedMachine,
-    };
-
-    await saveCachedMachine(`id:${bestMatch.id}`, payload);
-    console.log("Saved resolved ID cache entry:", `id:${bestMatch.id}`);
-
-    console.log("Skipping exact-name cache write:", {
-      machineName,
-      selectedName: bestMatch.name,
-    });
-
-    return response(200, {
-      mode: "result",
-      source: payload.source,
-      query: machineName,
-      selectedMatch: payload.selectedMatch,
-      result: payload.result,
-      cache: {
-        hit: false,
-        cachedAt: null,
-      },
+    return response(404, {
+      error: "Route not found",
+      method: httpMethod,
+      path,
+      rawPath,
     });
   } catch (error) {
     console.error("Handler error:", error);
