@@ -1,5 +1,5 @@
 import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
-import { docClient } from "./dynamoClient.js";
+import { dynamodynamoDocClient } from "./dynamoClient.js";
 
 const TABLE_NAME = process.env.MACHINE_TABLE_NAME;
 
@@ -24,10 +24,10 @@ export async function getCachedMachine(machineName) {
 
   const command = new GetCommand({
     TableName: TABLE_NAME,
-    Key: { machineKey }
+    Key: { machineKey },
   });
 
-  const response = await docClient.send(command);
+  const response = await dynamoDocClient.send(command);
   return response.Item ?? null;
 }
 
@@ -42,15 +42,15 @@ export async function saveCachedMachine(machineName, payload) {
     source: payload.source,
     selectedMatch: payload.selectedMatch,
     result: payload.result,
-    cachedAt: new Date().toISOString()
+    cachedAt: new Date().toISOString(),
   };
 
   const command = new PutCommand({
     TableName: TABLE_NAME,
-    Item: item
+    Item: item,
   });
 
-  await docClient.send(command);
+  await dynamoDocClient.send(command);
 
   return item;
 }

@@ -1,11 +1,11 @@
 import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
-import { docClient } from "./dynamoClient.js";
+import { dynamoDocClient } from "./dynamoClient.js";
 
 const TABLE_NAME =
   process.env.METADATA_TABLE_NAME || "pinball_machine_metadata";
 
 export async function getMetadata(machineId) {
-  const result = await docClient.send(
+  const result = await dynamoDocClient.send(
     new GetCommand({
       TableName: TABLE_NAME,
       Key: { machineId },
@@ -24,7 +24,7 @@ export async function saveMetadata(record) {
     createdAt: record.createdAt || now,
   };
 
-  await docClient.send(
+  await dynamoDocClient.send(
     new PutCommand({
       TableName: TABLE_NAME,
       Item: item,
