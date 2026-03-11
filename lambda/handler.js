@@ -79,13 +79,14 @@ export const handler = async (event) => {
     const httpMethod =
       event.requestContext?.http?.method || event.httpMethod || "GET";
     const action = body.action || null;
-
-    const path =
+    const rawPath =
       event.rawPath || event.requestContext?.http?.path || event.path || "/";
+
+    const path = rawPath.replace(/^\/prod(?=\/|$)/, "") || "/";
     const searchQuery = event.queryStringParameters?.q;
 
     // DEBUG
-    console.log("ROUTE DEBUG:", { httpMethod, path });
+    console.log("ROUTE DEBUG:", { httpMethod, rawPath, path });
 
     // POST /machine metadata update
     if (httpMethod === "POST" && action === "updateMetadata") {
