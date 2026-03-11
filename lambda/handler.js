@@ -79,15 +79,17 @@ export const handler = async (event) => {
     const httpMethod = event.httpMethod || "GET";
     const action = body.action || null;
     const searchQuery = event.queryStringParameters?.q;
-    if (httpMethod === "POST" && event.rawPath === "/customers") {
-      const customer = await createCustomer(body);
 
+    // POST /customers
+    if (httpMethod === "POST" && path === "/customers") {
+      const customer = await createCustomer(body);
       return response(200, {
         ok: true,
         customer,
       });
     }
-    if (httpMethod === "GET" && event.rawPath === "/customers") {
+    // GET /customers
+    if (httpMethod === "GET" && path === "/customers") {
       const customers = await listCustomers();
 
       return response(200, {
@@ -96,31 +98,15 @@ export const handler = async (event) => {
       });
     }
 
-    if (httpMethod === "POST" && action === "updateMetadata") {
-      const metadataMachineId = body.machineId;
+    // GET /customers/{id}
+    if (httpMethod === "GET" && path.startsWith("/customers/")) {
+      const customerId = path.split("/")[2];
 
-      if (!metadataMachineId) {
-        return response(400, {
-          error: "Missing machineId",
-        });
-      }
-
-      let metadata = await getMetadata(metadataMachineId);
-
-      if (!metadata) {
-        return response(404, {
-          error: "Metadata record not found",
-          machineId: metadataMachineId,
-        });
-      }
-
-      metadata = updateMetadataRecord(metadata, body);
-      metadata = await saveMetadata(metadata);
+      const customer = await getCustomer(customerId);
 
       return response(200, {
         ok: true,
-        machineId: metadataMachineId,
-        updatedMetadata: metadata,
+        customer,
       });
     }
 
