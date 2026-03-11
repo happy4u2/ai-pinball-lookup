@@ -15,6 +15,9 @@ import {
   listCustomers,
 } from "./scripts/customerService.js";
 
+// DEBUG
+console.log("ROUTE DEBUG:", { httpMethod, path });
+
 function normalizeCacheKey(text) {
   return (text || "").trim().toLowerCase();
 }
