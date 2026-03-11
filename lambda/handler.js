@@ -78,6 +78,7 @@ export const handler = async (event) => {
     }
     const httpMethod = event.httpMethod || "GET";
     const action = body.action || null;
+    const path = event.requestContext?.http?.path || event.rawPath || "";
     const searchQuery = event.queryStringParameters?.q;
 
     // POST /customers
