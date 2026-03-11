@@ -15,9 +15,6 @@ import {
   listCustomers,
 } from "./scripts/customerService.js";
 
-// DEBUG
-console.log("ROUTE DEBUG:", { httpMethod, path });
-
 function normalizeCacheKey(text) {
   return (text || "").trim().toLowerCase();
 }
@@ -84,6 +81,37 @@ export const handler = async (event) => {
     const path = event.requestContext?.http?.path || event.rawPath || "";
     const searchQuery = event.queryStringParameters?.q;
 
+    // DEBUG
+    console.log("ROUTE DEBUG:", { httpMethod, path });
+
+    // POST /machine metadata update
+    if (httpMethod === "POST" && action === "updateMetadata") {
+      const metadataMachineId = body.machineId;
+
+      if (!metadataMachineId) {
+        return response(400, {
+          error: "Missing machineId",
+        });
+      }
+
+      let metadata = await getMetadata(metadataMachineId);
+
+      if (!metadata) {
+        return response(404, {
+          error: "Metadata record not found",
+          machineId: metadataMachineId,
+        });
+      }
+
+      metadata = updateMetadataRecord(metadata, body);
+      metadata = await saveMetadata(metadata);
+
+      return response(200, {
+        ok: true,
+        machineId: metadataMachineId,
+        updatedMetadata: metadata,
+      });
+    }
     // POST /customers
     if (httpMethod === "POST" && path === "/customers") {
       const customer = await createCustomer(body);
