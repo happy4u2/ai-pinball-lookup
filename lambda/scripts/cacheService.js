@@ -1,5 +1,5 @@
 import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
-import { dynamodynamoDocClient } from "./dynamoClient.js";
+import { dynamoDocClient } from "./dynamoClient.js";
 
 const TABLE_NAME = process.env.MACHINE_TABLE_NAME;
 
