@@ -1,18 +1,10 @@
-# SwissPinball AI Backend
+# AI Pinball Lookup
 
-Serverless **Pinball Intelligence Platform** for SwissPinball.
+Serverless backend powering the **SwissPinball Machine Intelligence Platform**.
 
-This backend powers a knowledge system capable of:
+This system provides structured machine information, customer management, machine ownership tracking, and service history for pinball machines.
 
-- identifying pinball machines
-- enriching machine metadata
-- discovering manuals automatically
-- managing customers
-- linking machines to owners
-- tracking service history
-- assisting repairs with AI
-
-Built using **AWS serverless architecture** for scalability, reliability, and low maintenance.
+The backend is built using **AWS Lambda, API Gateway, and DynamoDB**.
 
 ---
 
@@ -20,112 +12,128 @@ Built using **AWS serverless architecture** for scalability, reliability, and lo
 
 - [Overview](#overview)
 - [Architecture](#architecture)
-- [Technology Stack](#technology-stack)
-- [API Endpoint](#api-endpoint)
-- [Machine Lookup API](#machine-lookup-api)
-- [Machine Metadata System](#machine-metadata-system)
-- [Customer API](#customer-api)
-- [DynamoDB Tables](#dynamodb-tables)
 - [Project Structure](#project-structure)
-- [Machine Data Pipeline](#machine-data-pipeline)
-- [Development Environment](#development-environment)
-- [Local Development](#local-development)
+- [API Overview](#api-overview)
+- [Machine Lookup API](#machine-lookup-api)
+- [Customer API](#customer-api)
+- [Machine Instance API](#machine-instance-api)
+- [Service History API](#service-history-api)
+- [Metadata System](#metadata-system)
+- [Caching Strategy](#caching-strategy)
+- [Development](#development)
 - [Deployment](#deployment)
+- [Git Workflow](#git-workflow)
 - [Future Roadmap](#future-roadmap)
-- [Project Vision](#project-vision)
 
 ---
 
 # Overview
 
-The **SwissPinball AI Backend** is a serverless platform designed to store and manage technical knowledge about pinball machines and their owners.
+The **AI Pinball Lookup backend** is a serverless platform designed to power the SwissPinball ecosystem.
 
-Primary capabilities:
+It combines:
 
-- Machine identification
-- Machine metadata enrichment
-- Repair knowledge storage
-- Customer management
-- Manual discovery
-- Service tracking
-- AI repair assistance (future)
+- Open Pinball Database (OPDB) machine data
+- SwissPinball internal metadata
+- Machine ownership tracking
+- Technician service records
 
-The system acts as the **core intelligence layer** for the SwissPinball ecosystem.
+The system allows technicians and collectors to:
+
+- identify machines
+- retrieve structured technical information
+- track machines owned by customers
+- record service history
+- enrich machine metadata
 
 ---
 
 # Architecture
 
-```
-Frontend (React UI)
-        ↓
-API Gateway (HTTP API)
-        ↓
-AWS Lambda (Node.js)
-        ↓
+Client  
+↓  
+API Gateway (HTTP API)  
+↓  
+AWS Lambda (Node.js 24)  
+↓  
+Route Dispatcher  
+↓  
+Domain Routes  
+↓  
+Service Layer  
+↓  
 DynamoDB
-```
 
 External data sources:
 
-```
-OPDB – Open Pinball Database
-IPDB – Internet Pinball Database
-```
-
-Future AI integration:
-
-```
-Amazon Bedrock
-Claude
-```
+- OPDB (Open Pinball Database)
+- IPDB (manual discovery)
 
 ---
 
-# Technology Stack
+# Project Structure
 
-| Component       | Technology        |
-| --------------- | ----------------- |
-| Backend Runtime | Node.js 24        |
-| API Layer       | AWS API Gateway   |
-| Compute         | AWS Lambda        |
-| Database        | DynamoDB          |
-| External Data   | OPDB / IPDB       |
-| Future AI       | Amazon Bedrock    |
-| Source Control  | GitHub            |
-| Local Dev       | Windows + VS Code |
+```
+lambda/
+
+handler.js
+
+routes/
+├── customerRoutes.js
+├── instanceRoutes.js
+├── serviceRecordRoutes.js
+├── machineRoutes.js
+└── routeUtils.js
+
+scripts/
+├── opdbService.js
+├── opdbDetailService.js
+├── cacheService.js
+├── metadataService.js
+├── metadataMapper.js
+├── mergeMachineData.js
+├── metadataKeys.js
+├── ipdbManualService.js
+├── updateMetadataRecord.js
+├── customerService.js
+├── instanceService.js
+└── serviceRecordService.js
+```
+
+Design principle:
+
+Route Layer  
+↓  
+Service Layer  
+↓  
+Database
+
+This keeps the **Lambda handler small and maintainable**.
 
 ---
 
-# API Endpoint
+# API Overview
 
-Base endpoint:
-
-```
-https://cp114tpb2i.execute-api.eu-central-1.amazonaws.com/prod
-```
+| Domain            | Endpoint           |
+| ----------------- | ------------------ |
+| Machine lookup    | `/machine`         |
+| Customers         | `/customers`       |
+| Machine instances | `/instances`       |
+| Service records   | `/service-records` |
 
 ---
 
 # Machine Lookup API
 
-## Search Machines
+Search machines using OPDB.
 
-Search OPDB using typeahead.
+## Typeahead Search
 
-```
-GET /machine?q={search}
-```
-
-Example:
-
-```
 GET /machine?q=twilight
+
+Example response:
+
 ```
-
-Response:
-
-```json
 {
   "mode": "typeahead",
   "query": "twilight",
@@ -135,88 +143,50 @@ Response:
 
 ---
 
-## Lookup Machine by Name
+## Machine Lookup by Name
 
-```
-GET /machine?name=Twilight%20Zone
-```
+GET /machine?name=Twilight Zone
 
-Returns normalized machine data enriched with metadata.
+Returns normalized machine data.
 
 ---
 
-## Lookup Machine by OPDB ID
+## Machine Lookup by ID
 
-```
 GET /machine?id=GrXzD-MjBPX
-```
 
 ---
 
-## Update Machine Metadata
+## Metadata Update
 
-```
 POST /machine
+
+Example:
+
 ```
-
-Body example:
-
-```json
 {
   "action": "updateMetadata",
   "machineId": "opdb:grxzd-mjbpx",
-  "repairNotes": [],
-  "commonIssues": []
+  "notes": "Prototype run"
 }
-```
-
----
-
-# Machine Metadata System
-
-Machine metadata extends OPDB data with technician knowledge.
-
-Stored information:
-
-```
-manuals
-repairNotes
-commonIssues
-parts
-serviceTags
-references
-content
-```
-
-Metadata records are created automatically when a machine is first requested.
-
-Example metadata key:
-
-```
-machineId: opdb:grxzd-mjbpx
 ```
 
 ---
 
 # Customer API
 
-Customer records allow SwissPinball to track machine owners.
+Create and manage customers.
 
 ## Create Customer
 
-```
 POST /customers
+
+Example:
+
 ```
-
-Example body:
-
-```json
 {
-  "name": "Xavier",
-  "phone": "+41792108272",
-  "email": "x@example.com",
-  "address": "Lausanne",
-  "notes": "Indiana Jones machine"
+  "name": "John Doe",
+  "email": "john@example.com"
 }
 ```
 
@@ -224,338 +194,216 @@ Example body:
 
 ## List Customers
 
-```
 GET /customers
-```
 
 ---
 
 ## Get Customer
 
-```
-GET /customers/{customerId}
-```
-
-Example:
-
-```
-GET /customers/cust:704fbe8e-c602-40a4-aa56-56ae5d547be8
-```
+GET /customers/{id}
 
 ---
 
 ## Update Customer
 
-```
-PUT /customers/{customerId}
-```
-
-Example body:
-
-```json
-{
-  "notes": "Indiana Jones machine - right flipper weak"
-}
-```
-
-Behavior:
-
-- Partial updates supported
-- `createdAt` preserved
-- `updatedAt` refreshed
-- WhatsApp link regenerated if phone changes
+PUT /customers/{id}
 
 ---
 
-# DynamoDB Tables
+# Machine Instance API
 
-## Machine Cache
+Represents **real machines owned by customers**.
 
-Table:
+Example:
 
-```
-pinball_machines
-```
-
-Purpose:
-
-Cache OPDB machine responses.
-
-Primary key:
-
-```
-machineKey
-```
-
-Example keys:
-
-```
-id:GrXzD-MjBPX
-name:twilight zone
-```
+Addams Family owned by John Doe.
 
 ---
 
-## Machine Metadata
+## Create Instance
 
-Table:
-
-```
-pinball_machine_metadata
-```
-
-Primary key:
-
-```
-machineId
-```
+POST /instances
 
 Example:
 
 ```
-opdb:grxzd-mjbpx
-```
-
-Stored data:
-
-```
-manuals
-repairNotes
-commonIssues
-parts
-serviceTags
-references
-content
-```
-
----
-
-## Customers
-
-Table:
-
-```
-pinball_customers
-```
-
-Schema:
-
-```
-customerId
-name
-phone
-whatsapp
-email
-address
-notes
-createdAt
-updatedAt
-```
-
-Example record:
-
-```json
 {
-  "customerId": "cust:704fbe8e-c602-40a4-aa56-56ae5d547be8",
-  "name": "Xavier",
-  "phone": "+41792108272",
-  "whatsapp": "https://wa.me/41792108272",
-  "email": "x@example.com",
-  "address": "Lausanne",
-  "notes": "Indiana Jones machine",
-  "createdAt": "2026-03-11T10:41:28.233Z",
-  "updatedAt": "2026-03-11T10:41:28.233Z"
+  "customerId": "cust:123",
+  "machineId": "opdb:grxzd-mjbpx",
+  "location": "Geneva"
 }
 ```
 
 ---
 
-# Project Structure
+## List Instances
+
+GET /instances
+
+Optional filters:
+
+GET /instances?customerId=cust:123  
+GET /instances?machineId=opdb:abc
+
+---
+
+## Get Instance
+
+GET /instances/{id}
+
+---
+
+## Update Instance
+
+PUT /instances/{id}
+
+---
+
+# Service History API
+
+Tracks repair history for machines.
+
+## Create Service Record
+
+POST /service-records
+
+Example:
 
 ```
-lambda/
-│
-├── handler.js
-│
-└── scripts/
-    ├── opdbService.js
-    ├── opdbDetailService.js
-    ├── normalizeMachine.js
-    ├── resolveMatch.js
-    ├── cacheService.js
-    ├── dynamoClient.js
-    ├── metadataService.js
-    ├── metadataMapper.js
-    ├── metadataKeys.js
-    ├── mergeMachineData.js
-    ├── updateMetadataRecord.js
-    ├── ipdbManualService.js
-    └── customerService.js
+{
+  "instanceId": "inst:abc",
+  "serviceDate": "2026-03-12",
+  "technician": "David Haughton",
+  "serviceType": "repair",
+  "diagnosis": "Left flipper weak",
+  "workPerformed": "Rebuilt flipper",
+  "partsUsed": ["plunger","coil stop"],
+  "laborCost": 125
+}
 ```
 
 ---
 
-# Machine Data Pipeline
+## Get Service Record
 
-Machine lookup process:
-
-```
-User Request
-      ↓
-Cache lookup (DynamoDB)
-      ↓
-OPDB search
-      ↓
-Machine detail lookup
-      ↓
-Normalization
-      ↓
-Metadata enrichment
-      ↓
-IPDB manual discovery
-      ↓
-Merged machine response
-```
+GET /service-records/{serviceId}
 
 ---
 
-# Development Environment
+## List Service Records for Machine
 
-Runtime:
+GET /instances/{id}/service-records
+
+---
+
+# Metadata System
+
+Metadata stores additional machine information beyond OPDB.
+
+Example metadata fields:
+
+- manuals
+- technical notes
+- repair tips
+- IPDB references
+
+If metadata does not exist, a **metadata shell** is automatically created.
+
+---
+
+# Caching Strategy
+
+Machine lookups are cached to reduce OPDB requests.
+
+Cache keys:
 
 ```
-Node.js 24
+name:twilight zone
+id:GrXzD-MjBPX
 ```
 
-Deployment stack:
+Cache storage:
 
-```
-AWS Lambda
-API Gateway
 DynamoDB
-```
-
-Local development tools:
-
-```
-Windows
-VS Code
-PowerShell
-GitHub
-```
 
 ---
 
-# Local Development
+# Development
 
-Install dependencies:
-
-```
-npm install
-```
-
-Run tests:
+Local test example:
 
 ```
 node test-opdb.js
 ```
 
-Check syntax:
+Example API test:
 
 ```
-node --check handler.js
+GET /machine?q=twilight
 ```
 
 ---
 
 # Deployment
 
-Deploy through GitHub or AWS CLI.
+Deployment is handled automatically using **GitHub Actions**.
 
-Example Lambda deployment command:
+Pipeline:
+
+GitHub Push  
+↓  
+GitHub Actions  
+↓  
+Zip Lambda  
+↓  
+Deploy to AWS
+
+Manual deployment:
 
 ```
 aws lambda update-function-code \
-  --function-name ai-pinball-lookup \
-  --zip-file fileb://deployment.zip
+--function-name ai-pinball-lookup \
+--zip-file fileb://deployment.zip \
+--region eu-central-1
+```
+
+---
+
+# Git Workflow
+
+Commit and push changes:
+
+```
+git add README.md
+git commit -m "Update README with modular architecture and service history API"
+git push
 ```
 
 ---
 
 # Future Roadmap
 
-## Phase 14 — Machine Instances
+### Service Record Editing
 
-Table:
+PUT /service-records/{id}
 
-```
-pinball_machine_instances
-```
+### Service Timeline
 
-Purpose:
+GET /instances/{id}/history
 
-Link customers to physical machines.
+### Technician AI Assistant
 
-Example:
-
-```
-Customer → Xavier
-Machine → Indiana Jones
-Location → Lausanne
-Issue → Weak flipper
-```
-
----
-
-## Phase 15 — Service History
-
-Table:
-
-```
-pinball_service_history
-```
-
-Fields:
-
-```
-instanceId
-serviceDate
-diagnosis
-workPerformed
-partsUsed
-laborCost
-```
-
----
-
-## Phase 16 — AI Technician Assistant
-
-Integration:
-
-```
-Amazon Bedrock
-Claude
-```
+Future AI integration using AWS Bedrock.
 
 Capabilities:
 
-```
-fault diagnosis
-repair guidance
-manual summarization
-parts lookup
-```
+- repair suggestions
+- troubleshooting assistance
+- machine diagnostics
 
 ---
 
-# Project Vision
+# Author
 
-Create a **SwissPinball machine intelligence and service platform** capable of:
-
-- identifying machines instantly
-- storing technician knowledge
-- tracking machine ownership
-- recording repair history
-- providing AI-assisted diagnostics
-
-The long-term goal is to build a **complete repair intelligence system for pinball technicians**.
+SwissPinball  
+Pinball restoration and machine intelligence platform.
