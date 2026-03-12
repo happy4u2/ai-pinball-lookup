@@ -48,6 +48,55 @@ export async function createServiceRecord(data) {
 
   return item;
 }
+
+export async function getServiceRecord(serviceId) {
+  if (!serviceId) {
+    return null;
+  }
+
+  const result = await docClient.send(
+    new GetCommand({
+      TableName: TABLE_NAME,
+      Key: { serviceId },
+    }),
+  );
+
+  return result.Item || null;
+}
+
+export async function listServiceRecordsByInstance(instanceId) {
+  if (!instanceId) {
+    throw new Error("instanceId is required");
+  }
+
+  const result = await docClient.send(
+    new QueryCommand({
+      TableName: TABLE_NAME,
+      IndexName: INSTANCE_INDEX,
+      KeyConditionExpression: "instanceId = :instanceId",
+      ExpressionAttributeValues: {
+        ":instanceId": instanceId,
+      },
+    }),
+  );
+
+  return result.Items || [];
+}
+
+export async function getServiceTimelineByInstance(instanceId) {
+  if (!instanceId) {
+    throw new Error("instanceId is required");
+  }
+
+  const items = await listServiceRecordsByInstance(instanceId);
+
+  return [...items].sort((a, b) => {
+    const dateA = a.serviceDate || a.createdAt || "";
+    const dateB = b.serviceDate || b.createdAt || "";
+    return dateA.localeCompare(dateB);
+  });
+}
+
 export async function updateServiceRecord(serviceId, data) {
   if (!serviceId) {
     throw new Error("serviceId is required");
@@ -107,35 +156,4 @@ export async function updateServiceRecord(serviceId, data) {
   );
 
   return result.Attributes;
-}
-export async function getServiceRecord(serviceId) {
-  if (!serviceId) return null;
-
-  const result = await docClient.send(
-    new GetCommand({
-      TableName: TABLE_NAME,
-      Key: { serviceId },
-    }),
-  );
-
-  return result.Item || null;
-}
-
-export async function listServiceRecordsByInstance(instanceId) {
-  if (!instanceId) {
-    throw new Error("instanceId is required");
-  }
-
-  const result = await docClient.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      IndexName: INSTANCE_INDEX,
-      KeyConditionExpression: "instanceId = :instanceId",
-      ExpressionAttributeValues: {
-        ":instanceId": instanceId,
-      },
-    }),
-  );
-
-  return result.Items || [];
 }
