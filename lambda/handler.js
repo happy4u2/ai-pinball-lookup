@@ -51,10 +51,10 @@ export const handler = async (event) => {
     let result = await handleCustomerRoutes(ctx);
     if (result) return result;
 
-    result = await handleInstanceRoutes(ctx);
+    result = await handleServiceRecordRoutes(ctx);
     if (result) return result;
 
-    result = await handleServiceRecordRoutes(ctx);
+    result = await handleInstanceRoutes(ctx);
     if (result) return result;
 
     result = await handleMachineRoutes(ctx);
