@@ -70,6 +70,7 @@ export async function handleServiceRecordRoutes({ httpMethod, path, body }) {
     path.endsWith("/service-records")
   ) {
     console.log("HISTORY ROUTE MATCHED:", path);
+
     const match = path.match(/^\/instances\/([^/]+)\/service-records$/);
 
     if (!match?.[1]) {
