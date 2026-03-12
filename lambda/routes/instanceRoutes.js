@@ -6,22 +6,16 @@ import {
   listInstancesByMachine,
   updateInstance,
 } from "../scripts/instanceService.js";
-import { getPathId } from "./routeUtils.js";
+import { getPathId, jsonResponse } from "./routeUtils.js";
 
-export async function handleInstanceRoutes({
-  httpMethod,
-  path,
-  body,
-  event,
-  response,
-}) {
+export async function handleInstanceRoutes({ httpMethod, path, body, query }) {
   /*
   POST /instances
   */
   if (httpMethod === "POST" && path === "/instances") {
     const instance = await createInstance(body);
 
-    return response(201, {
+    return jsonResponse(201, {
       ok: true,
       instance,
     });
@@ -44,7 +38,7 @@ export async function handleInstanceRoutes({
       items = await listInstances();
     }
 
-    return response(200, {
+    return jsonResponse(200, {
       ok: true,
       count: items.length,
       items,
@@ -58,18 +52,18 @@ export async function handleInstanceRoutes({
     const instanceId = getPathId(path, "/instances");
 
     if (!instanceId) {
-      return response(400, { error: "Missing instanceId" });
+      return jsonResponse(400, { error: "Missing instanceId" });
     }
 
     const instance = await getInstance(instanceId);
 
     if (!instance) {
-      return response(404, {
+      return jsonResponse(404, {
         error: "Instance not found",
       });
     }
 
-    return response(200, {
+    return jsonResponse(200, {
       ok: true,
       instance,
     });
@@ -82,16 +76,16 @@ export async function handleInstanceRoutes({
     const instanceId = getPathId(path, "/instances");
 
     if (!instanceId) {
-      return response(400, { error: "Missing instanceId" });
+      return jsonResponse(400, { error: "Missing instanceId" });
     }
 
     const instance = await updateInstance(instanceId, body);
 
     if (!instance) {
-      return response(404, { error: "Instance not found" });
+      return jsonResponse(404, { error: "Instance not found" });
     }
 
-    return response(200, {
+    return jsonResponse(200, {
       ok: true,
       instance,
     });
