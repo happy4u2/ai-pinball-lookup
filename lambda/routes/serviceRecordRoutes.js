@@ -7,6 +7,8 @@ import {
 import { getPathId, jsonResponse } from "./routeUtils.js";
 
 export async function handleServiceRecordRoutes({ httpMethod, path, body }) {
+  console.log("SERVICE ROUTES CHECK:", httpMethod, path);
+
   if (httpMethod === "POST" && path === "/service-records") {
     if (!body?.instanceId) {
       return jsonResponse(400, { error: "instanceId is required" });
@@ -67,6 +69,7 @@ export async function handleServiceRecordRoutes({ httpMethod, path, body }) {
     path.startsWith("/instances/") &&
     path.endsWith("/service-records")
   ) {
+    console.log("HISTORY ROUTE MATCHED:", path);
     const match = path.match(/^\/instances\/([^/]+)\/service-records$/);
 
     if (!match?.[1]) {
