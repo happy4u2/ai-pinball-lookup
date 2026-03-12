@@ -2,8 +2,19 @@ const ALLOWED_FIELDS = [
   "aliases",
   "manuals",
   "manualCandidates",
+
   "commonIssues",
   "repairNotes",
+  "internalNotes",
+
+  "coilReferences",
+  "switchNotes",
+  "lampNotes",
+  "displayNotes",
+  "mechanismNotes",
+  "diagnosticChecks",
+  "recommendedParts",
+
   "parts",
   "serviceTags",
   "content",
