@@ -1,5 +1,10 @@
 import crypto from "node:crypto";
-import { GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import {
+  GetCommand,
+  PutCommand,
+  QueryCommand,
+  UpdateCommand,
+} from "@aws-sdk/lib-dynamodb";
 import { docClient } from "./dynamoClient.js";
 
 const TABLE_NAME = "pinball_service_history";
