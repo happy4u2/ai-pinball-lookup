@@ -448,3 +448,92 @@ This enables:
 - machine lifecycle tracking
 - intelligent repair guidance
 - collector inventory management
+
+---
+
+# CONTINUATION PROMPT FOR NEW CHAT
+
+You are assisting with development of the **SwissPinball AI Pinball Lookup Backend**.
+
+The backend is already implemented and operational.
+
+Architecture:
+
+Client  
+↓  
+API Gateway (HTTP API)  
+↓  
+AWS Lambda (Node.js 24)  
+↓  
+Route Dispatcher  
+↓  
+Domain Routes  
+↓  
+Service Layer  
+↓  
+DynamoDB
+
+External sources:
+
+- OPDB (Open Pinball Database)
+- IPDB (manual lookup support)
+
+Current working APIs:
+
+GET /machine  
+POST /machine
+
+POST /customers  
+GET /customers  
+GET /customers/{id}  
+PUT /customers/{id}
+
+POST /instances  
+GET /instances  
+GET /instances/{id}  
+PUT /instances/{id}
+
+POST /service-records  
+GET /service-records/{serviceId}  
+PUT /service-records/{serviceId}
+
+GET /instances/{instanceId}/service-records  
+GET /instances/{instanceId}/history
+
+The system already supports:
+
+• machine lookup via OPDB  
+• DynamoDB caching  
+• machine metadata storage  
+• customer management  
+• machine ownership tracking  
+• service history tracking  
+• repair timeline retrieval
+
+Current development phase:
+
+Phase 17 — Machine Knowledge Base
+
+Next goal:
+
+Extend `machine_metadata` to support technician knowledge:
+
+- commonFailures
+- repairTips
+- recommendedParts
+- boardNotes
+- manualLinks
+
+This data will later power an **AI Technician Assistant using AWS Bedrock**.
+
+When helping continue development:
+
+- prioritize backend architecture
+- keep the system serverless
+- maintain modular service files
+- prefer DynamoDB-friendly schemas
+- keep APIs simple and technician-focused
+
+The project is maintained by **SwissPinball** and designed for **professional pinball repair technicians**.
+
+Continue from **Phase 17 implementation planning**.
