@@ -1,5 +1,7 @@
 # AI Pinball Lookup Backend — Project State
 
+CURRENT DEVELOPMENT PHASE: Phase 17 — Machine Knowledge Base
+
 ## Overview
 
 This project is the backend infrastructure for **SwissPinball**.
