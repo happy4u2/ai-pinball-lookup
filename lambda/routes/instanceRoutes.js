@@ -9,8 +9,6 @@ import {
 import { getPathId, jsonResponse } from "./routeUtils.js";
 
 export async function handleInstanceRoutes({ httpMethod, path, body, query }) {
-  console.log("INSTANCE ROUTES CHECK:", httpMethod, path);
-
   /*
   POST /instances
   */

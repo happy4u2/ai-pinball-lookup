@@ -38,8 +38,6 @@ export const handler = async (event) => {
     const path = normalizePath(event);
     const query = event.queryStringParameters || {};
 
-    console.log("ROUTE DEBUG:", { httpMethod, rawPath, path });
-
     const ctx = {
       event,
       body,
