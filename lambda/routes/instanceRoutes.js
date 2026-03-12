@@ -1,11 +1,11 @@
 import {
   createInstance,
+  getInstance,
   listInstances,
   listInstancesByCustomer,
   listInstancesByMachine,
-  getInstance,
   updateInstance,
-} from "../scripts/machineInstanceService.js";
+} from "../scripts/instanceService.js";
 import { getPathId } from "./routeUtils.js";
 
 export async function handleInstanceRoutes({
