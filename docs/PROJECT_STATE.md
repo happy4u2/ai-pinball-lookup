@@ -1,9 +1,3 @@
-## Project Documentation
-
-Project state and architecture documentation:
-
-- [Project State](docs/PROJECT_STATE.md)
-
 # AI Pinball Lookup Backend — Project State
 
 ## Overview
@@ -11,7 +5,6 @@ Project state and architecture documentation:
 This project is the backend infrastructure for **SwissPinball**.
 
 The goal is to build a **machine intelligence platform for pinball technicians**.
-
 The system manages:
 
 - pinball machine identification

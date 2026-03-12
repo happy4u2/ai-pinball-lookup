@@ -1,3 +1,9 @@
+## Project Documentation
+
+Project state and architecture documentation:
+
+- [Project State](docs/PROJECT_STATE.md)
+
 # AI Pinball Lookup
 
 Serverless backend powering the **SwissPinball Machine Intelligence Platform**.
