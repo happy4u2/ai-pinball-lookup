@@ -25,8 +25,8 @@ export async function handleInstanceRoutes({ httpMethod, path, body, query }) {
   GET /instances
   */
   if (httpMethod === "GET" && path === "/instances") {
-    const customerId = event.queryStringParameters?.customerId;
-    const machineId = event.queryStringParameters?.machineId;
+    const customerId = query?.customerId;
+    const machineId = query?.machineId;
 
     let items;
 
@@ -47,8 +47,13 @@ export async function handleInstanceRoutes({ httpMethod, path, body, query }) {
 
   /*
   GET /instances/{id}
+  Exclude /instances/{id}/service-records
   */
-  if (httpMethod === "GET" && path.startsWith("/instances/")) {
+  if (
+    httpMethod === "GET" &&
+    path.startsWith("/instances/") &&
+    !path.endsWith("/service-records")
+  ) {
     const instanceId = getPathId(path, "/instances");
 
     if (!instanceId) {
