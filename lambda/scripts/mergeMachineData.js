@@ -19,10 +19,18 @@ export function mergeMachineData(machine, metadata) {
 
           serviceTags: metadata.serviceTags || [],
 
+          coilReferences: metadata.coilReferences || [],
+          switchNotes: metadata.switchNotes || [],
+          lampNotes: metadata.lampNotes || [],
+          displayNotes: metadata.displayNotes || [],
+          mechanismNotes: metadata.mechanismNotes || [],
+          diagnosticChecks: metadata.diagnosticChecks || [],
+          recommendedParts: metadata.recommendedParts || [],
+
           content: metadata.content || {},
 
           status: metadata.status || "active",
-          schemaVersion: metadata.schemaVersion || 1,
+          schemaVersion: metadata.schemaVersion || 2,
 
           createdAt: metadata.createdAt || null,
           updatedAt: metadata.updatedAt || null,
