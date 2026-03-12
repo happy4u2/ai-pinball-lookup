@@ -1,143 +1,87 @@
-import crypto from "node:crypto";
 import {
-  GetCommand,
-  PutCommand,
-  QueryCommand,
-  UpdateCommand,
-} from "@aws-sdk/lib-dynamodb";
-import { docClient } from "./dynamoClient.js";
+  createServiceRecord,
+  getServiceRecord,
+  listServiceRecordsByInstance,
+  updateServiceRecord,
+} from "../scripts/serviceRecordService.js";
+import { getPathId, jsonResponse } from "./routeUtils.js";
 
-const TABLE_NAME = "pinball_service_history";
-const INSTANCE_INDEX = "instanceId-index";
+export async function handleServiceRecordRoutes({ httpMethod, path, body }) {
+  if (httpMethod === "POST" && path === "/service-records") {
+    if (!body?.instanceId) {
+      return jsonResponse(400, { error: "instanceId is required" });
+    }
 
-function newServiceId() {
-  return `srv:${crypto.randomUUID()}`;
-}
+    const serviceRecord = await createServiceRecord(body);
 
-export async function createServiceRecord(data) {
-  if (!data?.instanceId) {
-    throw new Error("instanceId is required");
+    return jsonResponse(201, {
+      ok: true,
+      serviceRecord,
+    });
   }
 
-  const now = new Date().toISOString();
+  if (httpMethod === "GET" && path.startsWith("/service-records/")) {
+    const serviceId = getPathId(path, "/service-records");
 
-  const item = {
-    serviceId: newServiceId(),
-    instanceId: data.instanceId,
-    customerId: data.customerId || null,
-    machineId: data.machineId || null,
-    serviceDate: data.serviceDate || now.slice(0, 10),
-    technician: data.technician || null,
-    serviceType: data.serviceType || "repair",
-    status: data.status || "open",
-    laborCost: data.laborCost ?? 0,
-    notes: data.notes || "",
-    partsUsed: Array.isArray(data.partsUsed) ? data.partsUsed : [],
-    createdAt: now,
-    updatedAt: now,
-  };
+    if (!serviceId) {
+      return jsonResponse(400, { error: "Missing serviceId" });
+    }
 
-  await docClient.send(
-    new PutCommand({
-      TableName: TABLE_NAME,
-      Item: item,
-    }),
-  );
+    const serviceRecord = await getServiceRecord(serviceId);
 
-  return item;
-}
+    if (!serviceRecord) {
+      return jsonResponse(404, { error: "Service record not found" });
+    }
 
-export async function getServiceRecord(serviceId) {
-  if (!serviceId) {
-    throw new Error("serviceId is required");
+    return jsonResponse(200, {
+      ok: true,
+      serviceRecord,
+    });
   }
 
-  const result = await docClient.send(
-    new GetCommand({
-      TableName: TABLE_NAME,
-      Key: { serviceId },
-    }),
-  );
+  if (httpMethod === "PUT" && path.startsWith("/service-records/")) {
+    const serviceId = getPathId(path, "/service-records");
 
-  return result.Item || null;
-}
+    if (!serviceId) {
+      return jsonResponse(400, { error: "Missing serviceId" });
+    }
 
-export async function listServiceRecordsByInstance(instanceId) {
-  if (!instanceId) {
-    throw new Error("instanceId is required");
-  }
+    try {
+      const serviceRecord = await updateServiceRecord(serviceId, body || {});
 
-  const result = await docClient.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      IndexName: INSTANCE_INDEX,
-      KeyConditionExpression: "instanceId = :instanceId",
-      ExpressionAttributeValues: {
-        ":instanceId": instanceId,
-      },
-    }),
-  );
+      return jsonResponse(200, {
+        ok: true,
+        serviceRecord,
+      });
+    } catch (error) {
+      if (error.name === "ConditionalCheckFailedException") {
+        return jsonResponse(404, { error: "Service record not found" });
+      }
 
-  return result.Items || [];
-}
-
-export async function updateServiceRecord(serviceId, data) {
-  if (!serviceId) {
-    throw new Error("serviceId is required");
-  }
-
-  const allowedFields = ["status", "laborCost", "notes", "partsUsed"];
-  const fields = Object.keys(data || {}).filter((key) =>
-    allowedFields.includes(key),
-  );
-
-  if (fields.length === 0) {
-    throw new Error(
-      "No valid fields to update. Allowed fields: status, laborCost, notes, partsUsed",
-    );
+      return jsonResponse(400, { error: error.message });
+    }
   }
 
   if (
-    Object.prototype.hasOwnProperty.call(data, "laborCost") &&
-    typeof data.laborCost !== "number"
+    httpMethod === "GET" &&
+    path.startsWith("/instances/") &&
+    path.endsWith("/service-records")
   ) {
-    throw new Error("laborCost must be a number");
+    const match = path.match(/^\/instances\/([^/]+)\/service-records$/);
+
+    if (!match?.[1]) {
+      return jsonResponse(400, { error: "Missing instanceId" });
+    }
+
+    const instanceId = match[1];
+    const items = await listServiceRecordsByInstance(instanceId);
+
+    return jsonResponse(200, {
+      ok: true,
+      count: items.length,
+      items,
+    });
   }
 
-  if (
-    Object.prototype.hasOwnProperty.call(data, "partsUsed") &&
-    !Array.isArray(data.partsUsed)
-  ) {
-    throw new Error("partsUsed must be an array");
-  }
-
-  const now = new Date().toISOString();
-
-  const updateExpressions = [];
-  const expressionAttributeNames = {};
-  const expressionAttributeValues = {};
-
-  for (const field of fields) {
-    updateExpressions.push(`#${field} = :${field}`);
-    expressionAttributeNames[`#${field}`] = field;
-    expressionAttributeValues[`:${field}`] = data[field];
-  }
-
-  updateExpressions.push("#updatedAt = :updatedAt");
-  expressionAttributeNames["#updatedAt"] = "updatedAt";
-  expressionAttributeValues[":updatedAt"] = now;
-
-  const result = await docClient.send(
-    new UpdateCommand({
-      TableName: TABLE_NAME,
-      Key: { serviceId },
-      UpdateExpression: `SET ${updateExpressions.join(", ")}`,
-      ExpressionAttributeNames: expressionAttributeNames,
-      ExpressionAttributeValues: expressionAttributeValues,
-      ConditionExpression: "attribute_exists(serviceId)",
-      ReturnValues: "ALL_NEW",
-    }),
-  );
-
-  return result.Attributes;
+  return null;
 }
