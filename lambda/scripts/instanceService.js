@@ -112,7 +112,7 @@ function buildNormalizedInstancePayload(data = {}, existing = null) {
   );
 
   return {
-    customerId: customerId || existing?.customerId || "",
+    customerId: customerId || existing?.customerId || null,
     machineId: sanitizeString(data.machineId || existing?.machineId),
     machineName: sanitizeString(data.machineName || existing?.machineName),
     instanceName: sanitizeString(data.instanceName || existing?.instanceName),
