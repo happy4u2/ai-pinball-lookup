@@ -13,87 +13,286 @@ export async function handleInstanceRoutes({ httpMethod, path, body, query }) {
   POST /instances
   */
   if (httpMethod === "POST" && path === "/instances") {
-    const instance = await createInstance(body);
+    try {
+      const instance = await createInstance(body || {});
 
-    return jsonResponse(201, {
-      ok: true,
-      instance,
-    });
+      return jsonResponse(201, {
+        ok: true,
+        instance,
+      });
+    } catch (error) {
+      return jsonResponse(400, {
+        ok: false,
+        error: error.message || "Failed to create instance",
+      });
+    }
   }
 
   /*
   GET /instances
   */
   if (httpMethod === "GET" && path === "/instances") {
-    const customerId = query?.customerId;
-    const machineId = query?.machineId;
+    try {
+      const customerId = query?.customerId;
+      const machineId = query?.machineId;
 
-    let items;
+      let items;
 
-    if (customerId) {
-      items = await listInstancesByCustomer(customerId);
-    } else if (machineId) {
-      items = await listInstancesByMachine(machineId);
-    } else {
-      items = await listInstances();
+      if (customerId) {
+        items = await listInstancesByCustomer(customerId);
+      } else if (machineId) {
+        items = await listInstancesByMachine(machineId);
+      } else {
+        items = await listInstances();
+      }
+
+      return jsonResponse(200, {
+        ok: true,
+        count: items.length,
+        items,
+      });
+    } catch (error) {
+      return jsonResponse(500, {
+        ok: false,
+        error: error.message || "Failed to list instances",
+      });
     }
-
-    return jsonResponse(200, {
-      ok: true,
-      count: items.length,
-      items,
-    });
   }
 
   /*
   GET /instances/{id}
-  Exclude /instances/{id}/service-records
+  Exclude:
+  - /instances/{id}/service-records
+  - /instances/{id}/history
   */
   if (
     httpMethod === "GET" &&
     path.startsWith("/instances/") &&
-    !path.endsWith("/service-records")
+    !path.endsWith("/service-records") &&
+    !path.endsWith("/history")
   ) {
-    const instanceId = getPathId(path, "/instances");
+    try {
+      const instanceId = getPathId(path, "/instances");
 
-    if (!instanceId) {
-      return jsonResponse(400, { error: "Missing instanceId" });
-    }
+      if (!instanceId) {
+        return jsonResponse(400, { ok: false, error: "Missing instanceId" });
+      }
 
-    const instance = await getInstance(instanceId);
+      const instance = await getInstance(instanceId);
 
-    if (!instance) {
-      return jsonResponse(404, {
-        error: "Instance not found",
+      if (!instance) {
+        return jsonResponse(404, {
+          ok: false,
+          error: "Instance not found",
+        });
+      }
+
+      return jsonResponse(200, {
+        ok: true,
+        instance,
+      });
+    } catch (error) {
+      return jsonResponse(500, {
+        ok: false,
+        error: error.message || "Failed to load instance",
       });
     }
-
-    return jsonResponse(200, {
-      ok: true,
-      instance,
-    });
   }
 
   /*
   PUT /instances/{id}
+  Exclude:
+  - /instances/{id}/service-records
+  - /instances/{id}/history
   */
-  if (httpMethod === "PUT" && path.startsWith("/instances/")) {
-    const instanceId = getPathId(path, "/instances");
+  if (
+    httpMethod === "PUT" &&
+    path.startsWith("/instances/") &&
+    !path.endsWith("/service-records") &&
+    !path.endsWith("/history")
+  ) {
+    try {
+      const instanceId = getPathId(path, "/instances");
 
-    if (!instanceId) {
-      return jsonResponse(400, { error: "Missing instanceId" });
+      if (!instanceId) {
+        return jsonResponse(400, { ok: false, error: "Missing instanceId" });
+      }
+
+      const instance = await updateInstance(instanceId, body || {});
+
+      if (!instance) {
+        return jsonResponse(404, {
+          ok: false,
+          error: "Instance not found",
+        });
+      }
+
+      return jsonResponse(200, {
+        ok: true,
+        instance,
+      });
+    } catch (error) {
+      if (error.message === "Instance not found") {
+        return jsonResponse(404, {
+          ok: false,
+          error: error.message,
+        });
+      }
+
+      return jsonResponse(400, {
+        ok: false,
+        error: error.message || "Failed to update instance",
+      });
     }
+  }
 
-    const instance = await updateInstance(instanceId, body);
+  return null;
+}import {
+  createInstance,
+  getInstance,
+  listInstances,
+  listInstancesByCustomer,
+  listInstancesByMachine,
+  updateInstance,
+} from "../scripts/instanceService.js";
+import { getPathId, jsonResponse } from "./routeUtils.js";
 
-    if (!instance) {
-      return jsonResponse(404, { error: "Instance not found" });
+export async function handleInstanceRoutes({ httpMethod, path, body, query }) {
+  /*
+  POST /instances
+  */
+  if (httpMethod === "POST" && path === "/instances") {
+    try {
+      const instance = await createInstance(body || {});
+
+      return jsonResponse(201, {
+        ok: true,
+        instance,
+      });
+    } catch (error) {
+      return jsonResponse(400, {
+        ok: false,
+        error: error.message || "Failed to create instance",
+      });
     }
+  }
 
-    return jsonResponse(200, {
-      ok: true,
-      instance,
-    });
+  /*
+  GET /instances
+  */
+  if (httpMethod === "GET" && path === "/instances") {
+    try {
+      const customerId = query?.customerId;
+      const machineId = query?.machineId;
+
+      let items;
+
+      if (customerId) {
+        items = await listInstancesByCustomer(customerId);
+      } else if (machineId) {
+        items = await listInstancesByMachine(machineId);
+      } else {
+        items = await listInstances();
+      }
+
+      return jsonResponse(200, {
+        ok: true,
+        count: items.length,
+        items,
+      });
+    } catch (error) {
+      return jsonResponse(500, {
+        ok: false,
+        error: error.message || "Failed to list instances",
+      });
+    }
+  }
+
+  /*
+  GET /instances/{id}
+  Exclude:
+  - /instances/{id}/service-records
+  - /instances/{id}/history
+  */
+  if (
+    httpMethod === "GET" &&
+    path.startsWith("/instances/") &&
+    !path.endsWith("/service-records") &&
+    !path.endsWith("/history")
+  ) {
+    try {
+      const instanceId = getPathId(path, "/instances");
+
+      if (!instanceId) {
+        return jsonResponse(400, { ok: false, error: "Missing instanceId" });
+      }
+
+      const instance = await getInstance(instanceId);
+
+      if (!instance) {
+        return jsonResponse(404, {
+          ok: false,
+          error: "Instance not found",
+        });
+      }
+
+      return jsonResponse(200, {
+        ok: true,
+        instance,
+      });
+    } catch (error) {
+      return jsonResponse(500, {
+        ok: false,
+        error: error.message || "Failed to load instance",
+      });
+    }
+  }
+
+  /*
+  PUT /instances/{id}
+  Exclude:
+  - /instances/{id}/service-records
+  - /instances/{id}/history
+  */
+  if (
+    httpMethod === "PUT" &&
+    path.startsWith("/instances/") &&
+    !path.endsWith("/service-records") &&
+    !path.endsWith("/history")
+  ) {
+    try {
+      const instanceId = getPathId(path, "/instances");
+
+      if (!instanceId) {
+        return jsonResponse(400, { ok: false, error: "Missing instanceId" });
+      }
+
+      const instance = await updateInstance(instanceId, body || {});
+
+      if (!instance) {
+        return jsonResponse(404, {
+          ok: false,
+          error: "Instance not found",
+        });
+      }
+
+      return jsonResponse(200, {
+        ok: true,
+        instance,
+      });
+    } catch (error) {
+      if (error.message === "Instance not found") {
+        return jsonResponse(404, {
+          ok: false,
+          error: error.message,
+        });
+      }
+
+      return jsonResponse(400, {
+        ok: false,
+        error: error.message || "Failed to update instance",
+      });
+    }
   }
 
   return null;
