@@ -13,10 +13,16 @@ import { buildMachineId } from "../scripts/metadataKeys.js";
 import { discoverIpdbManuals } from "../scripts/ipdbManualService.js";
 import { updateMetadataRecord } from "../scripts/updateMetadataRecord.js";
 import { buildKnowledgeIndex } from "../scripts/buildKnowledgeIndex.js";
+import { buildMachineEnrichmentContext } from "../scripts/machineEnrichmentService.js";
 import { jsonResponse } from "./routeUtils.js";
 
 function extractKnowledgeIndexPathId(path) {
   const match = path.match(/^\/machine\/([^/]+)\/knowledge-index$/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function extractEnrichedMachinePathId(path) {
+  const match = path.match(/^\/machine\/([^/]+)\/enriched$/);
   return match ? decodeURIComponent(match[1]) : null;
 }
 
@@ -69,6 +75,7 @@ export async function handleMachineRoutes({ httpMethod, path, body, query }) {
   const action = body?.action || null;
   const searchQuery = query?.q;
   const knowledgeIndexMachineId = extractKnowledgeIndexPathId(path);
+  const enrichedMachineId = extractEnrichedMachinePathId(path);
 
   if (
     httpMethod === "POST" &&
@@ -97,6 +104,16 @@ export async function handleMachineRoutes({ httpMethod, path, body, query }) {
       ok: true,
       machineId: metadataMachineId,
       updatedMetadata: metadata,
+    });
+  }
+
+  if (httpMethod === "GET" && enrichedMachineId) {
+    const enriched = await buildMachineEnrichmentContext(enrichedMachineId);
+
+    return jsonResponse(200, {
+      ok: true,
+      machineId: enrichedMachineId,
+      enriched,
     });
   }
 
