@@ -12,8 +12,8 @@ import { mergeMachineData } from "../scripts/mergeMachineData.js";
 import { buildMachineId } from "../scripts/metadataKeys.js";
 import { discoverIpdbManuals } from "../scripts/ipdbManualService.js";
 import { updateMetadataRecord } from "../scripts/updateMetadataRecord.js";
-import { jsonResponse } from "./routeUtils.js";
 import { buildKnowledgeIndex } from "../scripts/buildKnowledgeIndex.js";
+import { jsonResponse } from "./routeUtils.js";
 
 function extractKnowledgeIndexPathId(path) {
   const match = path.match(/^\/machine\/([^/]+)\/knowledge-index$/);
@@ -66,35 +66,16 @@ async function enrichWithMetadata(machine) {
 }
 
 export async function handleMachineRoutes({ httpMethod, path, body, query }) {
-  const action = body.action || null;
-  const searchQuery = query.q;
+  const action = body?.action || null;
+  const searchQuery = query?.q;
   const knowledgeIndexMachineId = extractKnowledgeIndexPathId(path);
 
-  if (httpMethod === "GET" && knowledgeIndexMachineId) {
-    const metadata = await getMetadata(knowledgeIndexMachineId);
-
-    if (!metadata) {
-      return jsonResponse(404, {
-        ok: false,
-        error: "Metadata record not found",
-        machineId: knowledgeIndexMachineId,
-      });
-    }
-
-    const knowledgeIndex = buildKnowledgeIndex(metadata);
-
-    return jsonResponse(200, {
-      ok: true,
-      machineId: knowledgeIndexMachineId,
-      knowledgeIndex,
-    });
-  }
   if (
     httpMethod === "POST" &&
     path === "/machine" &&
     action === "updateMetadata"
   ) {
-    const metadataMachineId = body.machineId;
+    const metadataMachineId = body?.machineId;
 
     if (!metadataMachineId) {
       return jsonResponse(400, { error: "Missing machineId" });
@@ -119,12 +100,32 @@ export async function handleMachineRoutes({ httpMethod, path, body, query }) {
     });
   }
 
+  if (httpMethod === "GET" && knowledgeIndexMachineId) {
+    const metadata = await getMetadata(knowledgeIndexMachineId);
+
+    if (!metadata) {
+      return jsonResponse(404, {
+        ok: false,
+        error: "Metadata record not found",
+        machineId: knowledgeIndexMachineId,
+      });
+    }
+
+    const knowledgeIndex = buildKnowledgeIndex(metadata);
+
+    return jsonResponse(200, {
+      ok: true,
+      machineId: knowledgeIndexMachineId,
+      knowledgeIndex,
+    });
+  }
+
   if (path !== "/machine") {
     return null;
   }
 
-  const machineName = body.machineName || query.name || query.machineName;
-  const machineId = body.id || query.id;
+  const machineName = body?.machineName || query?.name || query?.machineName;
+  const machineId = body?.id || query?.id;
 
   if (!machineName && !machineId && !searchQuery) {
     return jsonResponse(400, { error: "Missing machineName, id, or q" });
