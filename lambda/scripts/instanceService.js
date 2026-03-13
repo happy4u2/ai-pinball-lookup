@@ -97,18 +97,20 @@ function normalizeStatus(value) {
 function buildNormalizedInstancePayload(data = {}, existing = null) {
   const customerId = sanitizeNullableString(data.customerId);
   const ownershipType = normalizeOwnershipType(
-    data.ownershipType || existing?.ownershipType,
+    data.ownershipType || existing?.ownershipType
   );
 
   const ownerCustomerId =
     sanitizeNullableString(data.ownerCustomerId) ||
-    (ownershipType === "customer" ? customerId : null);
+    (ownershipType === "customer"
+      ? customerId || existing?.ownerCustomerId || existing?.customerId || null
+      : null);
 
   const assignedCustomerId =
     sanitizeNullableString(data.assignedCustomerId) || null;
 
   const rentalStatus = normalizeRentalStatus(
-    data.rentalStatus || existing?.rentalStatus,
+    data.rentalStatus || existing?.rentalStatus
   );
 
   return {
@@ -118,18 +120,16 @@ function buildNormalizedInstancePayload(data = {}, existing = null) {
     instanceName: sanitizeString(data.instanceName || existing?.instanceName),
     location: sanitizeString(data.location || existing?.location),
     currentLocationType: normalizeLocationType(
-      data.currentLocationType || existing?.currentLocationType,
+      data.currentLocationType || existing?.currentLocationType
     ),
     currentLocationLabel: sanitizeString(
-      data.currentLocationLabel || existing?.currentLocationLabel,
+      data.currentLocationLabel || existing?.currentLocationLabel
     ),
     ownershipType,
     ownerCustomerId,
     assignedCustomerId,
     rentalStatus,
-    condition: sanitizeString(
-      data.condition || existing?.condition || "unknown",
-    ),
+    condition: sanitizeString(data.condition || existing?.condition || "unknown"),
     status: normalizeStatus(data.status || existing?.status || "active"),
     serialNumber: sanitizeString(data.serialNumber || existing?.serialNumber),
     notes: sanitizeString(data.notes || existing?.notes),
@@ -151,9 +151,6 @@ export async function createInstance(data) {
   const instance = {
     instanceId: buildInstanceId(),
 
-    // legacy / compatibility field
-    customerId: normalized.customerId,
-
     // machine identity
     machineId: normalized.machineId,
     machineName: normalized.machineName,
@@ -164,7 +161,7 @@ export async function createInstance(data) {
     ownerCustomerId: normalized.ownerCustomerId,
 
     // location / assignment
-    location: normalized.location, // legacy compatibility
+    location: normalized.location, // legacy compatibility field
     currentLocationType: normalized.currentLocationType,
     currentLocationLabel: normalized.currentLocationLabel,
     assignedCustomerId: normalized.assignedCustomerId,
@@ -181,6 +178,10 @@ export async function createInstance(data) {
     updatedAt: timestamp,
   };
 
+  if (normalized.customerId) {
+    instance.customerId = normalized.customerId;
+  }
+
   if (!instance.machineId) {
     throw new Error("Missing machineId");
   }
@@ -193,7 +194,7 @@ export async function createInstance(data) {
     new PutCommand({
       TableName: TABLE_NAME,
       Item: instance,
-    }),
+    })
   );
 
   return instance;
@@ -208,7 +209,7 @@ export async function getInstance(instanceId) {
     new GetCommand({
       TableName: TABLE_NAME,
       Key: { instanceId },
-    }),
+    })
   );
 
   return result.Item || null;
@@ -222,7 +223,7 @@ export async function listInstances() {
   const result = await docClient.send(
     new ScanCommand({
       TableName: TABLE_NAME,
-    }),
+    })
   );
 
   return result.Items || [];
@@ -241,7 +242,7 @@ export async function listInstancesByCustomer(customerId) {
       ExpressionAttributeValues: {
         ":customerId": customerId,
       },
-    }),
+    })
   );
 
   return result.Items || [];
@@ -260,7 +261,7 @@ export async function listInstancesByMachine(machineId) {
       ExpressionAttributeValues: {
         ":machineId": machineId,
       },
-    }),
+    })
   );
 
   return result.Items || [];
@@ -289,26 +290,21 @@ export async function updateInstance(instanceId, data) {
   const values = {};
 
   const fields = {
-    // legacy / compatibility
-    customerId: normalized.customerId,
+    ...(normalized.customerId ? { customerId: normalized.customerId } : {}),
 
-    // machine identity
     machineId: normalized.machineId,
     machineName: normalized.machineName,
     instanceName: normalized.instanceName,
 
-    // ownership
     ownershipType: normalized.ownershipType,
     ownerCustomerId: normalized.ownerCustomerId,
 
-    // location / assignment
     location: normalized.location,
     currentLocationType: normalized.currentLocationType,
     currentLocationLabel: normalized.currentLocationLabel,
     assignedCustomerId: normalized.assignedCustomerId,
     rentalStatus: normalized.rentalStatus,
 
-    // state
     condition: normalized.condition,
     status: normalized.status,
     serialNumber: normalized.serialNumber,
@@ -334,7 +330,7 @@ export async function updateInstance(instanceId, data) {
       ExpressionAttributeNames: names,
       ExpressionAttributeValues: values,
       ReturnValues: "ALL_NEW",
-    }),
+    })
   );
 
   return result.Attributes || null;
