@@ -13,6 +13,12 @@ import { buildMachineId } from "../scripts/metadataKeys.js";
 import { discoverIpdbManuals } from "../scripts/ipdbManualService.js";
 import { updateMetadataRecord } from "../scripts/updateMetadataRecord.js";
 import { jsonResponse } from "./routeUtils.js";
+import { buildKnowledgeIndex } from "../scripts/buildKnowledgeIndex.js";
+
+function extractKnowledgeIndexPathId(path) {
+  const match = path.match(/^\/machine\/([^/]+)\/knowledge-index$/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
 
 function normalizeCacheKey(text) {
   return (text || "").trim().toLowerCase();
@@ -62,7 +68,27 @@ async function enrichWithMetadata(machine) {
 export async function handleMachineRoutes({ httpMethod, path, body, query }) {
   const action = body.action || null;
   const searchQuery = query.q;
+  const knowledgeIndexMachineId = extractKnowledgeIndexPathId(path);
 
+  if (httpMethod === "GET" && knowledgeIndexMachineId) {
+    const metadata = await getMetadata(knowledgeIndexMachineId);
+
+    if (!metadata) {
+      return jsonResponse(404, {
+        ok: false,
+        error: "Metadata record not found",
+        machineId: knowledgeIndexMachineId,
+      });
+    }
+
+    const knowledgeIndex = buildKnowledgeIndex(metadata);
+
+    return jsonResponse(200, {
+      ok: true,
+      machineId: knowledgeIndexMachineId,
+      knowledgeIndex,
+    });
+  }
   if (
     httpMethod === "POST" &&
     path === "/machine" &&

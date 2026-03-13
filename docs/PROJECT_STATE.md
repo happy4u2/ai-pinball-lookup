@@ -1,12 +1,15 @@
 # AI Pinball Lookup Backend — Project State
 
-CURRENT DEVELOPMENT PHASE: Phase 17 — Machine Knowledge Base
+CURRENT DEVELOPMENT PHASE: Phase 18 Preparation — AI Technician Assistant
 
-## Overview
+---
+
+# Overview
 
 This project is the backend infrastructure for **SwissPinball**.
 
 The goal is to build a **machine intelligence platform for pinball technicians**.
+
 The system manages:
 
 - pinball machine identification
@@ -14,6 +17,7 @@ The system manages:
 - customer records
 - physical machine ownership tracking
 - service history tracking
+- machine repair knowledge
 - future AI technician assistance
 
 The backend is **fully serverless and deployed on AWS**.
@@ -115,14 +119,36 @@ id:G4odr-mlzy7
 
 ## machine_metadata
 
-Stores **SwissPinball technical metadata**.
+Stores **SwissPinball machine knowledge and technician metadata**.
 
 Examples:
 
-- board notes
-- technician repair notes
-- parts references
+- common machine failures
+- repair notes
+- diagnostic checklists
+- recommended parts
+- coil references
 - manuals
+- service tags
+
+Example metadata fields:
+
+```
+commonIssues
+repairNotes
+internalNotes
+coilReferences
+switchNotes
+lampNotes
+displayNotes
+mechanismNotes
+diagnosticChecks
+recommendedParts
+manuals
+parts
+```
+
+This table forms the **Machine Knowledge Base**.
 
 ---
 
@@ -132,11 +158,13 @@ Stores customer records.
 
 Example fields:
 
-- customerId
-- name
-- email
-- phone
-- whatsapp
+```
+customerId
+name
+email
+phone
+whatsapp
+```
 
 ---
 
@@ -144,7 +172,7 @@ Example fields:
 
 Represents **real physical machines owned by customers**.
 
-Example:
+Relationship model:
 
 ```
 customer → owns → machine instance → linked to machine model
@@ -158,14 +186,16 @@ Stores service records.
 
 Each record includes:
 
-- serviceId
-- instanceId
-- technician
-- serviceDate
-- status
-- notes
-- laborCost
-- partsUsed
+```
+serviceId
+instanceId
+technician
+serviceDate
+status
+notes
+laborCost
+partsUsed
+```
 
 ---
 
@@ -203,6 +233,8 @@ opdbDetailService
      ↓
 normalizeMachine
      ↓
+metadata enrichment
+     ↓
 cacheService
 ```
 
@@ -214,6 +246,32 @@ machines_cache
 
 ---
 
+# Metadata Enrichment System
+
+Every machine lookup is enriched with **SwissPinball metadata**.
+
+Workflow:
+
+```
+machine lookup
+      ↓
+buildMachineId()
+      ↓
+getMetadata()
+      ↓
+createMetadataShell() if missing
+      ↓
+IPDB manual discovery
+      ↓
+saveMetadata()
+      ↓
+mergeMachineData()
+```
+
+This allows SwissPinball to attach **machine-specific repair knowledge** to OPDB machine models.
+
+---
+
 # Implemented API
 
 ## Machine API
@@ -222,17 +280,28 @@ machines_cache
 GET /machine?q=
 GET /machine?name=
 GET /machine?id=
-
 POST /machine
 ```
 
-POST is used to update machine metadata.
+POST `/machine` supports metadata updates:
+
+```
+action: updateMetadata
+```
+
+Example payload:
+
+```json
+{
+  "action": "updateMetadata",
+  "machineId": "opdb:g4odr-mdxey",
+  "repairNotes": ["Check EOS switch before replacing coil"]
+}
+```
 
 ---
 
 ## Customer API
-
-Create and manage customers.
 
 ```
 POST /customers
@@ -245,8 +314,6 @@ PUT /customers/{id}
 
 ## Machine Instance API
 
-Represents **a real pinball machine owned by someone**.
-
 ```
 POST /instances
 GET /instances
@@ -254,11 +321,11 @@ GET /instances/{id}
 PUT /instances/{id}
 ```
 
+Represents a **real machine owned by a customer**.
+
 ---
 
 ## Service Record API
-
-Tracks repairs and maintenance.
 
 ```
 POST /service-records
@@ -266,12 +333,14 @@ GET /service-records/{serviceId}
 PUT /service-records/{serviceId}
 ```
 
-Allowed update fields:
+Allowed updates:
 
-- status
-- laborCost
-- notes
-- partsUsed
+```
+status
+laborCost
+notes
+partsUsed
+```
 
 ---
 
@@ -283,40 +352,14 @@ Retrieve service records for a machine instance.
 GET /instances/{instanceId}/service-records
 ```
 
-Returns raw service records.
-
 ---
 
-# Phase 16 Feature — Machine Timeline
+# Machine Timeline
 
-Endpoint:
+Chronological repair history for a machine instance.
 
 ```
 GET /instances/{instanceId}/history
-```
-
-Returns chronological repair history.
-
-Example:
-
-```json
-{
-  "ok": true,
-  "instanceId": "ins:test-001",
-  "count": 2,
-  "history": [
-    {
-      "serviceId": "srv:123",
-      "status": "completed",
-      "notes": "Flipper rebuild"
-    },
-    {
-      "serviceId": "srv:456",
-      "status": "completed",
-      "notes": "GI LED upgrade"
-    }
-  ]
-}
 ```
 
 Sorting priority:
@@ -326,16 +369,55 @@ Sorting priority:
 
 ---
 
+# Machine Knowledge Base (Phase 17)
+
+The backend now supports structured **technician knowledge per machine model**.
+
+Supported knowledge fields:
+
+```
+commonIssues
+repairNotes
+internalNotes
+coilReferences
+switchNotes
+lampNotes
+displayNotes
+mechanismNotes
+diagnosticChecks
+recommendedParts
+manuals
+parts
+```
+
+Example:
+
+```json
+{
+  "machineId": "opdb:g4odr-mdxey",
+  "repairNotes": ["Check EOS switch before replacing coil"],
+  "diagnosticChecks": ["Check EOS switch", "Inspect flipper link"],
+  "recommendedParts": ["A-15405 flipper coil"]
+}
+```
+
+This system forms the **SwissPinball Machine Knowledge Base**.
+
+---
+
 # Core System Capabilities
 
 The backend currently supports:
 
-- machine identification
-- machine metadata enrichment
-- customer management
-- physical machine ownership tracking
-- service history tracking
-- repair timeline retrieval
+```
+machine identification
+machine metadata enrichment
+customer management
+physical machine ownership tracking
+service history tracking
+repair timeline retrieval
+machine repair knowledge storage
+```
 
 ---
 
@@ -358,48 +440,35 @@ Completed phases:
 ```
 Phase 15 — Instance Service History
 Phase 16 — Machine Timeline
+Phase 17 — Machine Knowledge Base
+```
+
+---
+
+# Phase Roadmap
+
+Upcoming development roadmap.
+
+```
+Phase 18 — AI Technician Assistant
+Phase 19 — Machine Knowledge Index
+Phase 20 — Technician Query Engine
+Phase 21 — Service Analytics
+Phase 22 — Machine Inventory System
+Phase 23 — Technician Dashboard API
+Phase 24 — Customer Portal API
+Phase 25 — Parts Intelligence System
+Phase 26 — Repair Recommendation Engine
+Phase 27 — Predictive Maintenance
 ```
 
 ---
 
 # Next Planned Development
 
-## Phase 17 — Machine Knowledge Base
-
-Extend `machine_metadata`.
-
-Add technician intelligence:
-
-- common failures
-- repair tips
-- recommended parts
-- board notes
-- manual links
-
-Example:
-
-```json
-{
-  "machineId": "G4odr-mlzy7",
-  "commonFailures": [
-    "flipper opto failure",
-    "magnet driver transistor burnout"
-  ],
-  "repairTips": ["check EOS switch first"]
-}
-```
-
----
-
 ## Phase 18 — AI Technician Assistant
 
-Integrate **AWS Bedrock**.
-
-Capabilities:
-
-- repair suggestions
-- diagnostic guidance
-- parts recommendations
+Integrate **AWS Bedrock** to provide diagnostic guidance.
 
 Example query:
 
@@ -410,23 +479,20 @@ Addams Family upper flipper weak
 Possible AI response:
 
 ```
-check EOS switch
-check coil stop
-check flipper link
-check driver transistor
+1 check EOS switch
+2 inspect flipper link
+3 check coil stop
+4 test driver transistor
 ```
 
----
+AI responses will be built using:
 
-## Phase 19 — SwissPinball Platform API
-
-Future platform layer:
-
-- customer portal
-- technician dashboard
-- repair reports
-- machine inventory
-- service analytics
+```
+machine metadata
+service history
+machine model information
+repair knowledge
+```
 
 ---
 
@@ -434,106 +500,82 @@ Future platform layer:
 
 SwissPinball becomes a **machine intelligence platform** where:
 
-- machines
-- owners
-- repair history
-- technical knowledge
-- AI diagnostics
+```
+machines
+owners
+repair history
+technical knowledge
+AI diagnostics
+```
 
 are connected in a unified system.
 
 This enables:
 
-- technician assistance
-- machine lifecycle tracking
-- intelligent repair guidance
-- collector inventory management
+```
+technician assistance
+machine lifecycle tracking
+intelligent repair guidance
+collector inventory management
+```
 
 ---
 
 # CONTINUATION PROMPT FOR NEW CHAT
 
-You are assisting with development of the **SwissPinball AI Pinball Lookup Backend**.
+Paste the following into a new ChatGPT conversation to resume the project instantly:
 
-The backend is already implemented and operational.
+```
+You are continuing development of the SwissPinball backend.
 
-Architecture:
+The project is an AWS serverless system:
 
-Client  
-↓  
-API Gateway (HTTP API)  
-↓  
-AWS Lambda (Node.js 24)  
-↓  
-Route Dispatcher  
-↓  
-Domain Routes  
-↓  
-Service Layer  
-↓  
-DynamoDB
+Client → API Gateway → Lambda (Node.js 24) → DynamoDB.
 
-External sources:
+Current completed phases:
 
-- OPDB (Open Pinball Database)
-- IPDB (manual lookup support)
-
-Current working APIs:
-
-GET /machine  
-POST /machine
-
-POST /customers  
-GET /customers  
-GET /customers/{id}  
-PUT /customers/{id}
-
-POST /instances  
-GET /instances  
-GET /instances/{id}  
-PUT /instances/{id}
-
-POST /service-records  
-GET /service-records/{serviceId}  
-PUT /service-records/{serviceId}
-
-GET /instances/{instanceId}/service-records  
-GET /instances/{instanceId}/history
+Phase 15 — Instance Service History
+Phase 16 — Machine Timeline
+Phase 17 — Machine Knowledge Base
 
 The system already supports:
 
-• machine lookup via OPDB  
-• DynamoDB caching  
-• machine metadata storage  
-• customer management  
-• machine ownership tracking  
-• service history tracking  
+• machine lookup via OPDB
+• machine metadata enrichment
+• customer management
+• machine instance tracking
+• service history tracking
 • repair timeline retrieval
+• technician knowledge storage per machine model
 
-Current development phase:
+Machine knowledge is stored in the `machine_metadata` DynamoDB table.
 
-Phase 17 — Machine Knowledge Base
+Supported metadata fields include:
 
-Next goal:
+commonIssues
+repairNotes
+internalNotes
+coilReferences
+switchNotes
+lampNotes
+displayNotes
+mechanismNotes
+diagnosticChecks
+recommendedParts
+manuals
+parts
 
-Extend `machine_metadata` to support technician knowledge:
+The next development phase is:
 
-- commonFailures
-- repairTips
-- recommendedParts
-- boardNotes
-- manualLinks
+Phase 18 — AI Technician Assistant.
 
-This data will later power an **AI Technician Assistant using AWS Bedrock**.
+Goal:
 
-When helping continue development:
+Allow queries such as:
 
-- prioritize backend architecture
-- keep the system serverless
-- maintain modular service files
-- prefer DynamoDB-friendly schemas
-- keep APIs simple and technician-focused
+"Addams Family upper flipper weak"
 
-The project is maintained by **SwissPinball** and designed for **professional pinball repair technicians**.
+and return a diagnostic checklist based on machine metadata and service history.
 
-Continue from **Phase 17 implementation planning**.
+Continue development starting with the Phase 18 architecture.
+```
