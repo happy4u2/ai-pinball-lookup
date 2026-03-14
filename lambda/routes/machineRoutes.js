@@ -107,14 +107,32 @@ export async function handleMachineRoutes({ httpMethod, path, body, query }) {
     });
   }
 
-  if (httpMethod === "GET" && enrichedMachineId) {
-    const enriched = await buildMachineEnrichmentContext(enrichedMachineId);
+  if (httpMethod === "GET" && path === "/machine/enriched") {
+    if (!enrichedMachineId) {
+      return jsonResponse(400, {
+        ok: false,
+        error: "Missing id",
+      });
+    }
 
-    return jsonResponse(200, {
-      ok: true,
-      machineId: enrichedMachineId,
-      enriched,
-    });
+    try {
+      const enriched = await buildMachineEnrichmentContext(enrichedMachineId);
+
+      return jsonResponse(200, {
+        ok: true,
+        machineId: enrichedMachineId,
+        enriched,
+      });
+    } catch (error) {
+      console.error("Machine enrichment route failed:", error);
+
+      return jsonResponse(500, {
+        ok: false,
+        error: "Failed to build machine enrichment context",
+        machineId: enrichedMachineId,
+        details: error?.message || "Unknown error",
+      });
+    }
   }
 
   if (httpMethod === "GET" && knowledgeIndexMachineId) {
