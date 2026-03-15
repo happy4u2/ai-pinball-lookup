@@ -23,14 +23,26 @@ export const handler = async (event) => {
   try {
     console.log("Raw event:", JSON.stringify(event));
 
+    const httpMethod =
+      event.requestContext?.http?.method || event.httpMethod || "GET";
+
+    if (httpMethod === "OPTIONS") {
+      return {
+        statusCode: 200,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
+        },
+        body: "",
+      };
+    }
+
     const body = event.body
       ? typeof event.body === "string"
         ? JSON.parse(event.body)
         : event.body
       : {};
-
-    const httpMethod =
-      event.requestContext?.http?.method || event.httpMethod || "GET";
 
     const rawPath =
       event.rawPath || event.requestContext?.http?.path || event.path || "/";
