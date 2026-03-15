@@ -72,6 +72,24 @@ function buildEnhancements() {
   };
 }
 
+function extractRawOpdbId(machineId, metadata) {
+  const rawFromMetadata =
+    metadata?.references?.opdbId ||
+    metadata?.opdbId ||
+    metadata?.opdb_id ||
+    null;
+
+  if (rawFromMetadata) {
+    return rawFromMetadata;
+  }
+
+  if (typeof machineId === "string" && machineId.startsWith("opdb:")) {
+    return machineId.slice(5);
+  }
+
+  return machineId;
+}
+
 export async function buildMachineEnrichmentContext(machineId, options = {}) {
   if (!machineId) {
     throw new Error("machineId is required");
@@ -81,7 +99,18 @@ export async function buildMachineEnrichmentContext(machineId, options = {}) {
   const includeServiceSignals = options.includeServiceSignals === true;
   const includeEnhancements = options.includeEnhancements === true;
 
-  const machineDetails = await opdbDetailService(machineId);
+  const canonicalMachineId =
+    typeof machineId === "string" && machineId.startsWith("opdb:")
+      ? machineId
+      : buildMachineId(machineId);
+
+  const existingMetadata = await getMetadata(canonicalMachineId);
+  const rawOpdbId = extractRawOpdbId(machineId, existingMetadata);
+
+  console.log("ENRICH canonicalMachineId:", canonicalMachineId);
+  console.log("ENRICH rawOpdbId:", rawOpdbId);
+
+  const machineDetails = await opdbDetailService(rawOpdbId);
   const machine = normalizeMachine(machineDetails);
 
   const metadata = await ensureMetadata(machine);
