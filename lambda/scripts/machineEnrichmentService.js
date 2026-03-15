@@ -107,11 +107,6 @@ export async function buildMachineEnrichmentContext(machineId, options = {}) {
   const existingMetadata = await getMetadata(canonicalMachineId);
   const rawOpdbId = extractRawOpdbId(machineId, existingMetadata);
 
-  console.log("ENRICH canonicalMachineId:", canonicalMachineId);
-  console.log("ENRICH rawOpdbId:", rawOpdbId);
-
-
-
   const machineDetails = await opdbDetailService(rawOpdbId);
   const machine = normalizeMachine(machineDetails);
 

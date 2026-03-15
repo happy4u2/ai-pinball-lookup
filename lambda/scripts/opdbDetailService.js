@@ -11,9 +11,6 @@ export async function opdbDetailService(machineId) {
 
   const url = `https://opdb.org/api/machines/${encodeURIComponent(machineId)}?api_token=${encodeURIComponent(apiToken)}`;
 
-  //DEBUG
-  console.log("OPDB DETAIL URL:", url);
-  console.log("OPDB DETAIL machineId:", machineId);
 
   const response = await fetch(url);
 
