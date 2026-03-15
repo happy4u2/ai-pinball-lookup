@@ -12,6 +12,20 @@ export async function searchMachineByName(name) {
 }
 
 export async function createCustomer(customerData) {
+  const payload = {
+    name: `${customerData.firstName || ""} ${customerData.lastName || ""}`.trim(),
+    phone: customerData.phone || "",
+    email: customerData.email || "",
+    address: [
+      customerData.addressLine1 || "",
+      customerData.postalCode || "",
+      customerData.city || "",
+    ]
+      .filter(Boolean)
+      .join(", "),
+    notes: customerData.notes || "",
+  };
+
   const url = `${API_BASE_URL}/customers`;
 
   const res = await fetch(url, {
@@ -19,7 +33,7 @@ export async function createCustomer(customerData) {
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(customerData),
+    body: JSON.stringify(payload),
   });
 
   if (!res.ok) {

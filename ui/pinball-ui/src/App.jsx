@@ -1,14 +1,26 @@
-import MachineSearch from "./components/MachineSearch";
-import CustomerForm from "./components/CustomerForm";
+import { useState } from "react";
+import DashboardLayout from "./layout/DashboardLayout";
+import Dashboard from "./pages/Dashboard";
+import Machines from "./pages/Machines";
+import Customers from "./pages/Customers";
 
 export default function App() {
-  return (
-    <main style={{ padding: "2rem", fontFamily: "Arial, sans-serif" }}>
-      <h1>SwissPinball UI</h1>
-      <p>Frontend MVP for machine lookup and customer intake.</p>
+  const [page, setPage] = useState("dashboard");
 
-      <MachineSearch />
-      <CustomerForm />
-    </main>
+  function renderPage() {
+    switch (page) {
+      case "machines":
+        return <Machines />;
+      case "customers":
+        return <Customers />;
+      default:
+        return <Dashboard />;
+    }
+  }
+
+  return (
+    <DashboardLayout page={page} setPage={setPage}>
+      {renderPage()}
+    </DashboardLayout>
   );
 }

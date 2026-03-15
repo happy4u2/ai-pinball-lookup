@@ -1,581 +1,326 @@
-# AI Pinball Lookup Backend — Project State
+# SwissPinball AI Backend + UI
+# Project State Snapshot
 
-CURRENT DEVELOPMENT PHASE: Phase 18 Preparation — AI Technician Assistant
-
----
-
-# Overview
-
-This project is the backend infrastructure for **SwissPinball**.
-
-The goal is to build a **machine intelligence platform for pinball technicians**.
-
-The system manages:
-
-- pinball machine identification
-- structured machine metadata
-- customer records
-- physical machine ownership tracking
-- service history tracking
-- machine repair knowledge
-- future AI technician assistance
-
-The backend is **fully serverless and deployed on AWS**.
+Last Updated: 2026-03-15
 
 ---
 
-# Architecture
+# Project Overview
 
-```
-Client
-   ↓
+SwissPinball is a serverless system for managing pinball machines, customers, and service history.
+
+The system consists of two main components:
+
+1. AWS Serverless Backend
+2. React Dashboard UI
+
+The goal is to create a **technician intelligence platform for pinball repair and management**.
+
+---
+
+# System Architecture
+
+Frontend
+
+React (Vite)
+
+↓
+
 API Gateway (HTTP API)
-   ↓
+
+↓
+
 AWS Lambda (Node.js 24)
-   ↓
+
+↓
+
 Route Dispatcher
-   ↓
-Domain Routes
-   ↓
+
+↓
+
 Service Layer
-   ↓
+
+↓
+
 DynamoDB
-```
-
-External data sources:
-
-- OPDB (Open Pinball Database)
-- IPDB (manual lookup support)
 
 ---
 
-# Technology Stack
+# Backend Status
 
-## Backend
+Backend is deployed and operational.
 
-AWS Lambda — Node.js 24  
-API Gateway — HTTP API  
-DynamoDB — primary datastore
+Base API endpoint:
 
-## Development
+https://cp114tpb2i.execute-api.eu-central-1.amazonaws.com/prod
 
-GitHub  
-GitHub Actions (Lambda deployment)  
-PowerShell API testing (`Invoke-RestMethod`)
+Working routes:
 
----
+GET /machine  
+Machine lookup via OPDB
 
-# Lambda Structure
+POST /customers  
+Create customer record
 
-```
-lambda/
+GET /instances  
+List machine instances
 
-handler.js
+POST /instances  
+Create machine instance
 
-routes/
-  customerRoutes.js
-  instanceRoutes.js
-  machineRoutes.js
-  serviceRecordRoutes.js
-  routeUtils.js
+GET /instances/{id}/history  
+Retrieve service history
 
-scripts/
-  cacheService.js
-  customerService.js
-  instanceService.js
-  metadataMapper.js
-  metadataService.js
-  mergeMachineData.js
-  metadataKeys.js
-  opdbService.js
-  opdbDetailService.js
-  ipdbManualService.js
-  updateMetadataRecord.js
-  serviceRecordService.js
-```
+POST /service-records  
+Create service record
 
 ---
 
 # DynamoDB Tables
 
-## machines_cache
+pinball_machine_metadata
 
-Stores cached OPDB machine lookups.
+pinball_customers
 
-Purpose:
+pinball_machine_instances
 
-- avoid repeated OPDB queries
-- improve lookup speed
-- reduce external API usage
-
-Cache keys:
-
-```
-name:twilight zone
-id:G4odr-mlzy7
-```
+pinball_service_history
 
 ---
 
-## machine_metadata
+# Machine Lookup Engine
 
-Stores **SwissPinball machine knowledge and technician metadata**.
+Machine lookup uses the Open Pinball Database.
 
-Examples:
+Flow:
 
-- common machine failures
-- repair notes
-- diagnostic checklists
-- recommended parts
-- coil references
-- manuals
-- service tags
-
-Example metadata fields:
-
-```
-commonIssues
-repairNotes
-internalNotes
-coilReferences
-switchNotes
-lampNotes
-displayNotes
-mechanismNotes
-diagnosticChecks
-recommendedParts
-manuals
-parts
-```
-
-This table forms the **Machine Knowledge Base**.
-
----
-
-## customers
-
-Stores customer records.
-
-Example fields:
-
-```
-customerId
-name
-email
-phone
-whatsapp
-```
-
----
-
-## pinball_machine_instances
-
-Represents **real physical machines owned by customers**.
-
-Relationship model:
-
-```
-customer → owns → machine instance → linked to machine model
-```
-
----
-
-## pinball_service_history
-
-Stores service records.
-
-Each record includes:
-
-```
-serviceId
-instanceId
-technician
-serviceDate
-status
-notes
-laborCost
-partsUsed
-```
-
----
-
-# Routing System
-
-The Lambda handler dispatches requests to modular route handlers.
-
-Route order inside `handler.js`:
-
-```
-customerRoutes
-serviceRecordRoutes
-instanceRoutes
-machineRoutes
-```
-
-Order matters to avoid route collisions.
-
----
-
-# Machine Lookup System
-
-Machine identification uses **OPDB**.
-
-Workflow:
-
-```
-machine query
-     ↓
-opdbService (typeahead search)
-     ↓
-resolveMatch
-     ↓
-opdbDetailService
-     ↓
-normalizeMachine
-     ↓
-metadata enrichment
-     ↓
-cacheService
-```
-
-Results are cached in:
-
-```
-machines_cache
-```
-
----
-
-# Metadata Enrichment System
-
-Every machine lookup is enriched with **SwissPinball metadata**.
-
-Workflow:
-
-```
-machine lookup
-      ↓
-buildMachineId()
-      ↓
-getMetadata()
-      ↓
-createMetadataShell() if missing
-      ↓
-IPDB manual discovery
-      ↓
-saveMetadata()
-      ↓
-mergeMachineData()
-```
-
-This allows SwissPinball to attach **machine-specific repair knowledge** to OPDB machine models.
-
----
-
-# Implemented API
-
-## Machine API
-
-```
-GET /machine?q=
-GET /machine?name=
-GET /machine?id=
-POST /machine
-```
-
-POST `/machine` supports metadata updates:
-
-```
-action: updateMetadata
-```
-
-Example payload:
-
-```json
-{
-  "action": "updateMetadata",
-  "machineId": "opdb:g4odr-mdxey",
-  "repairNotes": ["Check EOS switch before replacing coil"]
-}
-```
-
----
-
-## Customer API
-
-```
-POST /customers
-GET /customers
-GET /customers/{id}
-PUT /customers/{id}
-```
-
----
-
-## Machine Instance API
-
-```
-POST /instances
-GET /instances
-GET /instances/{id}
-PUT /instances/{id}
-```
-
-Represents a **real machine owned by a customer**.
-
----
-
-## Service Record API
-
-```
-POST /service-records
-GET /service-records/{serviceId}
-PUT /service-records/{serviceId}
-```
-
-Allowed updates:
-
-```
-status
-laborCost
-notes
-partsUsed
-```
-
----
-
-# Instance Service History
-
-Retrieve service records for a machine instance.
-
-```
-GET /instances/{instanceId}/service-records
-```
-
----
-
-# Machine Timeline
-
-Chronological repair history for a machine instance.
-
-```
-GET /instances/{instanceId}/history
-```
-
-Sorting priority:
-
-1. `serviceDate`
-2. `createdAt`
-
----
-
-# Machine Knowledge Base (Phase 17)
-
-The backend now supports structured **technician knowledge per machine model**.
-
-Supported knowledge fields:
-
-```
-commonIssues
-repairNotes
-internalNotes
-coilReferences
-switchNotes
-lampNotes
-displayNotes
-mechanismNotes
-diagnosticChecks
-recommendedParts
-manuals
-parts
-```
-
-Example:
-
-```json
-{
-  "machineId": "opdb:g4odr-mdxey",
-  "repairNotes": ["Check EOS switch before replacing coil"],
-  "diagnosticChecks": ["Check EOS switch", "Inspect flipper link"],
-  "recommendedParts": ["A-15405 flipper coil"]
-}
-```
-
-This system forms the **SwissPinball Machine Knowledge Base**.
-
----
-
-# Core System Capabilities
-
-The backend currently supports:
-
-```
-machine identification
-machine metadata enrichment
-customer management
-physical machine ownership tracking
-service history tracking
-repair timeline retrieval
-machine repair knowledge storage
-```
-
----
-
-# Current Status
-
-Backend is **stable and operational**.
-
-Working endpoints:
-
-```
-/machine
-/customers
-/instances
-/service-records
-/instances/{id}/history
-```
-
-Completed phases:
-
-```
-Phase 15 — Instance Service History
-Phase 16 — Machine Timeline
-Phase 17 — Machine Knowledge Base
-```
-
----
-
-# Phase Roadmap
-
-Upcoming development roadmap.
-
-```
-Phase 18 — AI Technician Assistant
-Phase 19 — Machine Knowledge Index
-Phase 20 — Technician Query Engine
-Phase 21 — Service Analytics
-Phase 22 — Machine Inventory System
-Phase 23 — Technician Dashboard API
-Phase 24 — Customer Portal API
-Phase 25 — Parts Intelligence System
-Phase 26 — Repair Recommendation Engine
-Phase 27 — Predictive Maintenance
-```
-
----
-
-# Next Planned Development
-
-## Phase 18 — AI Technician Assistant
-
-Integrate **AWS Bedrock** to provide diagnostic guidance.
+machineName
+→ OPDB search
+→ resolve best match
+→ OPDB detail fetch
+→ normalized machine record
 
 Example query:
 
-```
-Addams Family upper flipper weak
-```
-
-Possible AI response:
-
-```
-1 check EOS switch
-2 inspect flipper link
-3 check coil stop
-4 test driver transistor
-```
-
-AI responses will be built using:
-
-```
-machine metadata
-service history
-machine model information
-repair knowledge
-```
+/machine?name=Corvette
 
 ---
 
-# Long-Term Vision
+# Customer System
 
-SwissPinball becomes a **machine intelligence platform** where:
+Customer creation now works from both:
 
-```
-machines
-owners
-repair history
-technical knowledge
-AI diagnostics
-```
+PowerShell
+React UI
 
-are connected in a unified system.
+Example record:
 
-This enables:
+customerId  
+cust:ed4860e8-f134-4d60-9383-0da55ec61dbb
 
-```
-technician assistance
-machine lifecycle tracking
-intelligent repair guidance
-collector inventory management
-```
+Phone numbers are normalized to international format and WhatsApp links are generated automatically.
+
+Example:
+
+phone: +41792024050  
+whatsapp: https://wa.me/41792024050
+
+---
+
+# React UI Status
+
+Frontend stack:
+
+React
+Vite
+Fetch API
+
+Working features:
+
+Machine Lookup page
+Customer Creation page
+Dashboard shell
+
+UI structure:
+
+Sidebar Navigation
+
+Dashboard
+Machines
+Customers
+Instances
+Service
+
+Dashboard layout includes:
+
+Dark sidebar
+Dashboard stat cards
+Content panels
+
+---
+
+# CORS Configuration
+
+API Gateway CORS enabled via CLI.
+
+Command used:
+
+aws apigatewayv2 update-api  
+--api-id cp114tpb2i  
+--cors-configuration AllowOrigins="*" AllowMethods="GET,POST,PUT,DELETE,OPTIONS" AllowHeaders="Content-Type"  
+--region eu-central-1  
+--profile dev
+
+Browser communication now works correctly.
+
+---
+
+# Example Working Workflow
+
+Customer Creation
+
+React UI  
+↓
+
+POST /customers
+
+↓
+
+DynamoDB record created
+
+Example:
+
+Customer: Susy D’Anto  
+Machine: Williams Black Knight 2000  
+Location: Bussy-Chardonney
+
+---
+
+# Current System Capabilities
+
+Machine lookup from OPDB
+
+Customer record creation
+
+Machine instance storage
+
+Service history system (backend ready)
+
+React UI dashboard shell
+
+AWS serverless deployment
+
+---
+
+# Next Development Phase
+
+Implement the **complete workshop workflow**.
+
+Customer  
+↓
+
+Machine Instance  
+↓
+
+Service Record
+
+Example:
+
+Customer  
+Susy D’Anto
+
+Instance  
+Black Knight 2000
+
+Service  
+Repair left flipper
+
+---
+
+# Immediate Next Tasks
+
+Create Instance creation UI
+
+Create Service Record UI
+
+Attach machines to customers
+
+Display service history
+
+Improve dashboard metrics
+
+Customers count
+
+Machines in workshop
+
+Machines on rent
+
+Open repair jobs
+
+---
+
+# Long Term Vision
+
+SwissPinball becomes a **machine intelligence platform for pinball technicians**.
+
+Capabilities will include:
+
+Machine knowledge base
+
+Repair documentation
+
+Machine ownership tracking
+
+Service history database
+
+AI-assisted repair lookup
+
+Automatic machine recognition
+
+Parts tracking
+
+Workshop job management
 
 ---
 
 # CONTINUATION PROMPT FOR NEW CHAT
 
-Paste the following into a new ChatGPT conversation to resume the project instantly:
+Paste this prompt at the start of the next conversation:
 
-```
-You are continuing development of the SwissPinball backend.
+---
 
-The project is an AWS serverless system:
+You are continuing development of the SwissPinball system.
 
-Client → API Gateway → Lambda (Node.js 24) → DynamoDB.
+Backend:
+AWS Lambda (Node.js 24)
+API Gateway HTTP API
+DynamoDB
 
-Current completed phases:
+Frontend:
+React + Vite dashboard.
 
-Phase 15 — Instance Service History
-Phase 16 — Machine Timeline
-Phase 17 — Machine Knowledge Base
+Working features:
 
-The system already supports:
+Machine lookup via OPDB
+Customer creation via API
+Dashboard UI with sidebar
+Customers page
+Machines page
 
-• machine lookup via OPDB
-• machine metadata enrichment
-• customer management
-• machine instance tracking
-• service history tracking
-• repair timeline retrieval
-• technician knowledge storage per machine model
+Architecture:
 
-Machine knowledge is stored in the `machine_metadata` DynamoDB table.
+React UI
+→ API Gateway
+→ Lambda router
+→ Service layer
+→ DynamoDB
 
-Supported metadata fields include:
+Next feature to implement:
 
-commonIssues
-repairNotes
-internalNotes
-coilReferences
-switchNotes
-lampNotes
-displayNotes
-mechanismNotes
-diagnosticChecks
-recommendedParts
-manuals
-parts
-
-The next development phase is:
-
-Phase 18 — AI Technician Assistant.
+Machine Instance UI.
 
 Goal:
 
-Allow queries such as:
+Customer → Machine Instance → Service Record workflow.
 
-"Addams Family upper flipper weak"
-
-and return a diagnostic checklist based on machine metadata and service history.
-
-Continue development starting with the Phase 18 architecture.
-```
+Continue development from this state.
