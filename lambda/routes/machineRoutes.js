@@ -75,7 +75,7 @@ export async function handleMachineRoutes({ httpMethod, path, body, query }) {
   const action = body?.action || null;
   const searchQuery = query?.q;
   const knowledgeIndexMachineId = extractKnowledgeIndexPathId(path);
-  const enrichedMachineId = extractEnrichedMachinePathId(path);
+  const enrichedMachineId = query?.id;
 
   if (
     httpMethod === "POST" &&
@@ -107,17 +107,39 @@ export async function handleMachineRoutes({ httpMethod, path, body, query }) {
     });
   }
 
-  if (httpMethod === "GET" && enrichedMachineId) {
-    const enriched = await buildMachineEnrichmentContext(enrichedMachineId);
+  if (httpMethod === "GET" && path === "/machine/enriched") {
+    if (!enrichedMachineId) {
+      return jsonResponse(400, {
+        ok: false,
+        error: "Missing id",
+      });
+    }
 
-    return jsonResponse(200, {
-      ok: true,
-      machineId: enrichedMachineId,
-      enriched,
-    });
+    try {
+      const enriched = await buildMachineEnrichmentContext(enrichedMachineId);
+
+      return jsonResponse(200, {
+        ok: true,
+        machineId: enrichedMachineId,
+        enriched,
+      });
+    } catch (error) {
+      console.error("Machine enrichment route failed:", error);
+
+      return jsonResponse(500, {
+        ok: false,
+        error: "Failed to build machine enrichment context",
+        machineId: enrichedMachineId,
+        details: error?.message || "Unknown error",
+      });
+    }
   }
 
-  if (httpMethod === "GET" && knowledgeIndexMachineId) {
+  if (
+    httpMethod === "GET" &&
+    path.startsWith("/machine/") &&
+    path.endsWith("/knowledge-index")
+  ) {
     const metadata = await getMetadata(knowledgeIndexMachineId);
 
     if (!metadata) {
@@ -186,7 +208,10 @@ export async function handleMachineRoutes({ httpMethod, path, body, query }) {
       });
     }
 
-    const machineDetails = await opdbDetailService(machineId);
+    const rawMachineId = machineId.startsWith("opdb:")
+      ? machineId.slice(5)
+      : machineId;
+    const machineDetails = await opdbDetailService(rawMachineId);
     const normalizedResult = normalizeMachine(machineDetails);
     const enrichedMachine = await enrichWithMetadata(normalizedResult);
 
