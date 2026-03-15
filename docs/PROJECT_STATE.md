@@ -1,4 +1,5 @@
 # SwissPinball AI Backend + UI
+
 # Project State Snapshot
 
 Last Updated: 2026-03-15
@@ -167,7 +168,7 @@ Command used:
 
 aws apigatewayv2 update-api  
 --api-id cp114tpb2i  
---cors-configuration AllowOrigins="*" AllowMethods="GET,POST,PUT,DELETE,OPTIONS" AllowHeaders="Content-Type"  
+--cors-configuration AllowOrigins="\*" AllowMethods="GET,POST,PUT,DELETE,OPTIONS" AllowHeaders="Content-Type"  
 --region eu-central-1  
 --profile dev
 

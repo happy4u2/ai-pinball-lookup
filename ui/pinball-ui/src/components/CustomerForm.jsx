@@ -12,9 +12,9 @@ const initialForm = {
   notes: "Owns Williams Black Knight 2000. Requested quote.",
 };
 
-export default function CustomerForm() {
+export default function CustomerForm({ onCreated }) {
   const [form, setForm] = useState(initialForm);
-  const [result, setResult] = useState(null);
+  const [successMessage, setSuccessMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -26,11 +26,20 @@ export default function CustomerForm() {
     e.preventDefault();
     setLoading(true);
     setError("");
-    setResult(null);
+    setSuccessMessage("");
 
     try {
       const data = await createCustomer(form);
-      setResult(data);
+
+      setSuccessMessage(
+        `Customer created: ${data?.customer?.name || "Success"}`
+      );
+
+      if (onCreated) {
+        await onCreated();
+      }
+
+      setForm(initialForm);
     } catch (err) {
       setError(err.message || "Unknown error");
     } finally {
@@ -39,8 +48,15 @@ export default function CustomerForm() {
   }
 
   return (
-    <section>
-      <h2>Create Customer</h2>
+    <section
+      style={{
+        background: "#fff",
+        padding: "20px",
+        borderRadius: "12px",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+      }}
+    >
+      <h2 style={{ marginTop: 0 }}>Create Customer</h2>
 
       <form
         onSubmit={handleSubmit}
@@ -99,24 +115,16 @@ export default function CustomerForm() {
           rows={4}
         />
 
-        <button type="submit">Create Customer</button>
+        <button type="submit" disabled={loading}>
+          {loading ? "Saving..." : "Create Customer"}
+        </button>
       </form>
 
-      {loading && <p>Saving...</p>}
-      {error && <p style={{ color: "red" }}>{error}</p>}
-
-      {result && (
-        <pre
-          style={{
-            marginTop: "1rem",
-            padding: "1rem",
-            background: "#f4f4f4",
-            overflowX: "auto",
-          }}
-        >
-          {JSON.stringify(result, null, 2)}
-        </pre>
+      {successMessage && (
+        <p style={{ color: "green", marginTop: "1rem" }}>{successMessage}</p>
       )}
+
+      {error && <p style={{ color: "red", marginTop: "1rem" }}>{error}</p>}
     </section>
   );
 }

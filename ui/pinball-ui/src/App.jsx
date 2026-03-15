@@ -1,26 +1,25 @@
-import { useState } from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import DashboardLayout from "./layout/DashboardLayout";
 import Dashboard from "./pages/Dashboard";
-import Machines from "./pages/Machines";
 import Customers from "./pages/Customers";
+import Machines from "./pages/Machines";
+import Instances from "./pages/Instances";
+import InstanceDetail from "./pages/InstanceDetail";
+import Service from "./pages/Service";
 
 export default function App() {
-  const [page, setPage] = useState("dashboard");
-
-  function renderPage() {
-    switch (page) {
-      case "machines":
-        return <Machines />;
-      case "customers":
-        return <Customers />;
-      default:
-        return <Dashboard />;
-    }
-  }
-
   return (
-    <DashboardLayout page={page} setPage={setPage}>
-      {renderPage()}
-    </DashboardLayout>
+<BrowserRouter>
+  <DashboardLayout>
+    <Routes>
+      <Route path="/" element={<Dashboard />} />
+      <Route path="/customers" element={<Customers />} />
+      <Route path="/machines" element={<Machines />} />
+      <Route path="/instances" element={<Instances />} />
+      <Route path="/instances/:instanceId" element={<InstanceDetail />} />
+      <Route path="/service" element={<Service />} />
+    </Routes>
+  </DashboardLayout>
+</BrowserRouter>
   );
 }
