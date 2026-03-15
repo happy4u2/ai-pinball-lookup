@@ -11,11 +11,17 @@ export async function opdbDetailService(machineId) {
 
   const url = `https://opdb.org/api/machines/${encodeURIComponent(machineId)}?api_token=${encodeURIComponent(apiToken)}`;
 
+  //DEBUG
+  console.log("OPDB DETAIL URL:", url);
+  console.log("OPDB DETAIL machineId:", machineId);
+
   const response = await fetch(url);
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`OPDB detail request failed: ${response.status} ${response.statusText} - ${text}`);
+    throw new Error(
+      `OPDB detail request failed: ${response.status} ${response.statusText} - ${text}`,
+    );
   }
 
   return await response.json();
