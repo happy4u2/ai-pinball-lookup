@@ -110,10 +110,7 @@ export async function buildMachineEnrichmentContext(machineId, options = {}) {
   console.log("ENRICH canonicalMachineId:", canonicalMachineId);
   console.log("ENRICH rawOpdbId:", rawOpdbId);
 
-//DEBUG
-throw new Error(
-  `DEBUG canonicalMachineId=${canonicalMachineId} rawOpdbId=${rawOpdbId} metadata=${JSON.stringify(existingMetadata)}`
-);
+
 
   const machineDetails = await opdbDetailService(rawOpdbId);
   const machine = normalizeMachine(machineDetails);
