@@ -4,10 +4,6 @@ function normalizeMachineName(value) {
     .replace(/[^a-z0-9]/g, "");
 }
 
-//DEBUG
-const results = await opdbService(machineName);
-console.log("LOOKUP RESULTS AFTER OPDB:", JSON.stringify(results, null, 2));
-
 export async function opdbService(machineName) {
   if (!machineName) {
     throw new Error("Missing machineName");
@@ -23,12 +19,10 @@ export async function opdbService(machineName) {
 
   const response = await fetch(url);
 
-  //DEBUG
-  console.log("FINAL RESPONSE RESULTS:", JSON.stringify(results, null, 2));
   if (!response.ok) {
     const text = await response.text();
     throw new Error(
-      `OPDB typeahead request failed: ${response.status} ${response.statusText} - ${text}`
+      `OPDB typeahead request failed: ${response.status} ${response.statusText} - ${text}`,
     );
   }
 
@@ -49,7 +43,7 @@ export async function opdbService(machineName) {
 
   const exactMatches = mapped.filter((item) => {
     const combined = normalizeMachineName(
-      `${item.name} ${item.text} ${item.display} ${item.supplementary}`
+      `${item.name} ${item.text} ${item.display} ${item.supplementary}`,
     );
     return combined.includes(queryNorm);
   });

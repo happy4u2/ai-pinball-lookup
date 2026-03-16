@@ -290,15 +290,25 @@ export async function handleMachineRoutes({ httpMethod, path, body, query }) {
 
   const matchResolution = resolveMatch(machineName, results);
 
-  if (matchResolution.mode === "disambiguation") {
+  if (
+    matchResolution.mode === "disambiguation" ||
+    matchResolution.mode === "ambiguous"
+  ) {
     return jsonResponse(200, {
       mode: "disambiguation",
       query: machineName,
-      matches: matchResolution.matches,
+      matches: matchResolution.matches || [],
       cache: {
         hit: false,
         cachedAt: null,
       },
+    });
+  }
+
+  if (matchResolution.mode !== "selected" || !matchResolution.selectedMatch) {
+    return jsonResponse(500, {
+      error: "Invalid match resolution",
+      matchResolution,
     });
   }
 

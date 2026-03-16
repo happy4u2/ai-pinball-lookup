@@ -11,7 +11,7 @@ function baseTitle(text) {
   return normalizeTitle(text)
     .replace(
       /\b(gold|limited|edition|special|premium|le|collector|anniversary|deluxe|remake|redux|pro|home edition|30th anniversary)\b/g,
-      ""
+      "",
     )
     .replace(/\s+/g, " ")
     .trim();
@@ -55,7 +55,7 @@ function scoreResult(query, item) {
     "redux",
     "pro",
     "home edition",
-    "30th anniversary"
+    "30th anniversary",
   ];
 
   for (const word of variantWords) {
@@ -80,17 +80,17 @@ function scoreResult(query, item) {
 }
 
 export function resolveMatch(query, results) {
-  if (!results?.length) {
+  if (!Array.isArray(results) || results.length === 0) {
     return {
       mode: "not_found",
-      matches: []
+      matches: [],
     };
   }
 
   const scored = results.map((item, index) => ({
     item,
     index,
-    score: scoreResult(query, item)
+    score: scoreResult(query, item),
   }));
 
   scored.sort((a, b) => {
@@ -106,55 +106,59 @@ export function resolveMatch(query, results) {
   const second = scored[1] || null;
 
   const shortlist = scored.slice(0, 5).map((entry) => ({
-    id: entry.item.id,
-    text: entry.item.text,
-    name: entry.item.name,
-    supplementary: entry.item.supplementary,
-    display: entry.item.display,
-    score: entry.score
+    id: entry.item.id || "",
+    text: entry.item.text || "",
+    name: entry.item.name || "",
+    supplementary: entry.item.supplementary || "",
+    display: entry.item.display || "",
+    score: entry.score,
   }));
 
   const queryBase = baseTitle(query);
+  const queryHasExplicitVariant = normalizeTitle(query) !== queryBase;
 
   const sameFamily = scored.filter(
-    (entry) => baseTitle(entry.item.name) === queryBase
+    (entry) => baseTitle(entry.item.name) === queryBase,
   );
 
-  const queryHasExplicitVariant =
-    normalizeTitle(query) !== queryBase;
+  const familyTop = sameFamily[0] || null;
+  const familySecond = sameFamily[1] || null;
 
-  if (!queryHasExplicitVariant && sameFamily.length >= 2) {
-    return {
-      mode: "disambiguation",
-      matches: shortlist
-    };
-  }
+  // 1. Exact / clearly better top match should be selected immediately
+  const clearlyBetterOverall = !second || top.score - second.score >= 35;
 
-  const partialFamilyMatches = queryBase
-    ? scored.filter((entry) => baseTitle(entry.item.name).includes(queryBase))
-    : [];
-
-  if (!queryHasExplicitVariant && partialFamilyMatches.length >= 2) {
-    return {
-      mode: "disambiguation",
-      matches: shortlist
-    };
-  }
-
-  const clearlyBetter =
-    !second ||
-    top.score - second.score >= 35;
-
-  if (clearlyBetter) {
+  if (clearlyBetterOverall) {
     return {
       mode: "selected",
       selectedMatch: top.item,
-      matches: shortlist
+      matches: shortlist,
     };
   }
 
+  // 2. If user asked for a specific variant, prefer the top match
+  if (queryHasExplicitVariant) {
+    return {
+      mode: "selected",
+      selectedMatch: top.item,
+      matches: shortlist,
+    };
+  }
+
+  // 3. Only disambiguate within same family when top two family matches are genuinely close
+  const familyIsAmbiguous =
+    familyTop && familySecond && familyTop.score - familySecond.score < 20;
+
+  if (familyIsAmbiguous) {
+    return {
+      mode: "disambiguation",
+      matches: shortlist,
+    };
+  }
+
+  // 4. Otherwise just select the top result
   return {
-    mode: "disambiguation",
-    matches: shortlist
+    mode: "selected",
+    selectedMatch: top.item,
+    matches: shortlist,
   };
 }
