@@ -1,6 +1,35 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import MachineSearch from "../components/MachineSearch";
 
+//DEBUG
+function handleMachineSelected(machine) {
+  console.log("parent received machine", machine);
+  setSelectedMachine(machine);
+}
+
 export default function Machines() {
+  const [selectedMachine, setSelectedMachine] = useState(null);
+  const navigate = useNavigate();
+
+  function handleMachineSelected(machine) {
+    setSelectedMachine(machine);
+  }
+
+  function handleCreateInstance() {
+    if (!selectedMachine) return;
+
+    const machineId = selectedMachine.id || selectedMachine.machineId || "";
+    const machineName = selectedMachine.name || selectedMachine.machineName || "";
+
+    const params = new URLSearchParams({
+      machineId,
+      machineName,
+    });
+
+    navigate(`/instances?${params.toString()}`);
+  }
+
   return (
     <div
       style={{
@@ -16,7 +45,41 @@ export default function Machines() {
       <p style={{ color: "#64748b", marginTop: "-4px", marginBottom: "20px" }}>
         Search live machine data from the SwissPinball backend.
       </p>
-      <MachineSearch />
+
+      <MachineSearch onMachineSelected={handleMachineSelected} />
+
+      {selectedMachine && (
+        <div
+          style={{
+            marginTop: "24px",
+            padding: "20px",
+            borderRadius: "12px",
+            background: "#f8fafc",
+            border: "1px solid #e2e8f0",
+          }}
+        >
+          <h2 style={{ marginTop: 0 }}>Selected Machine Action</h2>
+
+          <p>
+            <strong>Name:</strong>{" "}
+            {selectedMachine.name || selectedMachine.machineName || "—"}
+          </p>
+
+          <p>
+            <strong>Details:</strong>{" "}
+            {selectedMachine.supplementary || "—"}
+          </p>
+
+          <p>
+            <strong>Machine ID:</strong>{" "}
+            {selectedMachine.id || selectedMachine.machineId || "—"}
+          </p>
+
+          <button onClick={handleCreateInstance}>
+            Create Instance from this Machine
+          </button>
+        </div>
+      )}
     </div>
   );
 }

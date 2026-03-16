@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { searchMachineByName } from "../api";
 
-export default function MachineSearch() {
+export default function MachineSearch({ onMachineSelected }) {
   const [machineName, setMachineName] = useState("");
   const [result, setResult] = useState(null);
   const [selectedMachine, setSelectedMachine] = useState(null);
@@ -21,6 +21,10 @@ export default function MachineSearch() {
 
       if (data?.mode === "result" && data?.machine) {
         setSelectedMachine(data.machine);
+
+        if (onMachineSelected) {
+          onMachineSelected(data.machine);
+        }
       }
     } catch (err) {
       setError(err.message || "Unknown error");
@@ -31,6 +35,10 @@ export default function MachineSearch() {
 
   function handleSelectMatch(match) {
     setSelectedMachine(match);
+
+    if (onMachineSelected) {
+      onMachineSelected(match);
+    }
   }
 
   function renderSelectedMachine(machine) {
