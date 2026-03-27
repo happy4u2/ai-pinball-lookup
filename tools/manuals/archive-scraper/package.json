@@ -1,0 +1,14 @@
+{
+  "name": "archive-scraper",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "search": "node ./src/scrape/search-archive.mjs",
+    "resolve": "node ./src/scrape/resolve-files.mjs",
+    "download": "node ./src/scrape/download-pdfs.mjs",
+    "all": "node ./src/index.mjs"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1"
+  }
+}
