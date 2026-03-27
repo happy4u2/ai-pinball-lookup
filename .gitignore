@@ -9,3 +9,7 @@ Thumbs.db
 .aws-sam/
 .vscode/
 .idea/
+# Manual ingestion tools
+tools/manuals/**/output/
+tools/manuals/**/.env
+tools/manuals/**/node_modules/

@@ -2,10 +2,18 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MachineSearch from "../components/MachineSearch";
 
-//DEBUG
-function handleMachineSelected(machine) {
-  console.log("parent received machine", machine);
-  setSelectedMachine(machine);
+function buildMachineInstanceParams(machine) {
+  const opdbId = machine?.opdb_id || machine?.id || machine?.machineId || "";
+  const normalizedMachineId = String(opdbId).startsWith("opdb:")
+    ? String(opdbId)
+    : opdbId
+      ? `opdb:${opdbId}`
+      : "";
+
+  return {
+    machineId: normalizedMachineId,
+    machineName: machine?.name || machine?.machineName || machine?.common_name || "",
+  };
 }
 
 export default function Machines() {
@@ -19,14 +27,7 @@ export default function Machines() {
   function handleCreateInstance() {
     if (!selectedMachine) return;
 
-    const machineId = selectedMachine.id || selectedMachine.machineId || "";
-    const machineName = selectedMachine.name || selectedMachine.machineName || "";
-
-    const params = new URLSearchParams({
-      machineId,
-      machineName,
-    });
-
+    const params = new URLSearchParams(buildMachineInstanceParams(selectedMachine));
     navigate(`/instances?${params.toString()}`);
   }
 
@@ -66,13 +67,13 @@ export default function Machines() {
           </p>
 
           <p>
-            <strong>Details:</strong>{" "}
-            {selectedMachine.supplementary || "—"}
+            <strong>Manufacturer:</strong>{" "}
+            {selectedMachine.manufacturer || "—"}
           </p>
 
           <p>
             <strong>Machine ID:</strong>{" "}
-            {selectedMachine.id || selectedMachine.machineId || "—"}
+            {buildMachineInstanceParams(selectedMachine).machineId || "—"}
           </p>
 
           <button onClick={handleCreateInstance}>

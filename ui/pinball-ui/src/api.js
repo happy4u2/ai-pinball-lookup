@@ -12,7 +12,9 @@ async function handleResponse(res, defaultMessage) {
   }
 
   if (!res.ok) {
-    throw new Error(data?.error || data?.message || `${defaultMessage}: ${res.status}`);
+    throw new Error(
+      data?.error || data?.message || `${defaultMessage}: ${res.status}`,
+    );
   }
 
   return data;
@@ -23,6 +25,13 @@ export async function searchMachineByName(name) {
   const res = await fetch(url);
 
   return handleResponse(res, "Machine lookup failed");
+}
+
+export async function getMachineById(machineId) {
+  const url = `${API_BASE_URL}/machine?id=${encodeURIComponent(machineId)}`;
+  const res = await fetch(url);
+
+  return handleResponse(res, "Machine load failed");
 }
 
 export async function createCustomer(customerData) {
@@ -71,9 +80,34 @@ export async function createInstance(payload) {
   return handleResponse(res, "Failed to create instance");
 }
 
+
+
+export async function getInstance(instanceId) {
+  const res = await fetch(
+    `${API_BASE_URL}/instances/${encodeURIComponent(instanceId)}`,
+  );
+
+  return handleResponse(res, "Failed to load instance");
+}
+
+export async function updateInstance(instanceId, payload) {
+  const res = await fetch(
+    `${API_BASE_URL}/instances/${encodeURIComponent(instanceId)}`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+
+  return handleResponse(res, "Failed to update instance");
+}
+
 export async function getInstanceHistory(instanceId) {
   const res = await fetch(
-    `${API_BASE_URL}/instances/${encodeURIComponent(instanceId)}/history`
+    `${API_BASE_URL}/instances/${encodeURIComponent(instanceId)}/history`,
   );
 
   return handleResponse(res, "Failed to load instance history");
@@ -90,6 +124,7 @@ export async function createServiceRecord(payload) {
 
   return handleResponse(res, "Failed to create service record");
 }
+
 export async function listCustomers() {
   const res = await fetch(`${API_BASE_URL}/customers`);
   return handleResponse(res, "Failed to load customers");

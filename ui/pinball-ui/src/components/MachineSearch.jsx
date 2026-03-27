@@ -1,11 +1,27 @@
 import { useState } from "react";
-import { searchMachineByName } from "../api";
+import { getMachineById, searchMachineByName } from "../api";
+
+function normalizeMachineFromResponse(data) {
+  return data?.result || data?.machine || null;
+}
+
+function getMachineId(machine) {
+  if (!machine) return "";
+
+  if (machine.machineId) return machine.machineId;
+  if (machine.id?.startsWith("opdb:")) return machine.id;
+  if (machine.opdb_id) return `opdb:${machine.opdb_id}`;
+  if (machine.id) return machine.id;
+
+  return "";
+}
 
 export default function MachineSearch({ onMachineSelected }) {
   const [machineName, setMachineName] = useState("");
   const [result, setResult] = useState(null);
   const [selectedMachine, setSelectedMachine] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [selectingId, setSelectingId] = useState("");
   const [error, setError] = useState("");
 
   async function handleSearch(e) {
@@ -19,11 +35,12 @@ export default function MachineSearch({ onMachineSelected }) {
       const data = await searchMachineByName(machineName);
       setResult(data);
 
-      if (data?.mode === "result" && data?.machine) {
-        setSelectedMachine(data.machine);
+      const machine = normalizeMachineFromResponse(data);
+      if (data?.mode === "result" && machine) {
+        setSelectedMachine(machine);
 
         if (onMachineSelected) {
-          onMachineSelected(data.machine);
+          onMachineSelected(machine);
         }
       }
     } catch (err) {
@@ -33,11 +50,35 @@ export default function MachineSearch({ onMachineSelected }) {
     }
   }
 
-  function handleSelectMatch(match) {
-    setSelectedMachine(match);
+  async function handleSelectMatch(match) {
+    const matchId = match?.id;
 
-    if (onMachineSelected) {
-      onMachineSelected(match);
+    if (!matchId) {
+      setError("Selected match is missing an ID.");
+      return;
+    }
+
+    setSelectingId(matchId);
+    setError("");
+
+    try {
+      const data = await getMachineById(matchId);
+      const machine = normalizeMachineFromResponse(data);
+
+      if (!machine) {
+        throw new Error("Machine details were not returned by the API");
+      }
+
+      setResult(data);
+      setSelectedMachine(machine);
+
+      if (onMachineSelected) {
+        onMachineSelected(machine);
+      }
+    } catch (err) {
+      setError(err.message || "Failed to load selected machine");
+    } finally {
+      setSelectingId("");
     }
   }
 
@@ -48,16 +89,22 @@ export default function MachineSearch({ onMachineSelected }) {
       <div style={cardStyle}>
         <h3 style={{ marginTop: 0 }}>Selected Machine</h3>
         <p>
-          <strong>Name:</strong> {machine.name || "—"}
+          <strong>Name:</strong> {machine.name || machine.common_name || "—"}
         </p>
         <p>
-          <strong>Details:</strong> {machine.supplementary || "—"}
+          <strong>Manufacturer:</strong> {machine.manufacturer || "—"}
         </p>
         <p>
           <strong>Display:</strong> {machine.display || "—"}
         </p>
         <p>
-          <strong>Machine ID:</strong> {machine.id || machine.machineId || "—"}
+          <strong>Players:</strong> {machine.player_count || "—"}
+        </p>
+        <p>
+          <strong>Type:</strong> {machine.type || "—"}
+        </p>
+        <p>
+          <strong>Machine ID:</strong> {getMachineId(machine) || "—"}
         </p>
       </div>
     );
@@ -72,28 +119,36 @@ export default function MachineSearch({ onMachineSelected }) {
         <p>Please choose the correct machine.</p>
 
         <div style={{ display: "grid", gap: "12px" }}>
-          {matches.map((match) => (
-            <div key={match.id} style={candidateStyle}>
-              <div>
-                <div>
-                  <strong>
-                    {match.name || match.text || "Unknown machine"}
-                  </strong>
-                </div>
-                <div>{match.supplementary || "—"}</div>
-                <div style={{ fontSize: "0.9rem", color: "#666" }}>
-                  Display: {match.display || "—"}
-                </div>
-                <div style={{ fontSize: "0.9rem", color: "#666" }}>
-                  Score: {match.score ?? "—"}
-                </div>
-              </div>
+          {matches.map((match) => {
+            const isLoadingThis = selectingId === match.id;
 
-              <button type="button" onClick={() => handleSelectMatch(match)}>
-                Select
-              </button>
-            </div>
-          ))}
+            return (
+              <div key={match.id} style={candidateStyle}>
+                <div>
+                  <div>
+                    <strong>
+                      {match.name || match.text || "Unknown machine"}
+                    </strong>
+                  </div>
+                  <div>{match.supplementary || "—"}</div>
+                  <div style={{ fontSize: "0.9rem", color: "#666" }}>
+                    Display: {match.display || "—"}
+                  </div>
+                  <div style={{ fontSize: "0.9rem", color: "#666" }}>
+                    Score: {match.score ?? "—"}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleSelectMatch(match)}
+                  disabled={!!selectingId}
+                >
+                  {isLoadingThis ? "Loading..." : "Select"}
+                </button>
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -112,7 +167,7 @@ export default function MachineSearch({ onMachineSelected }) {
     }
 
     if (result.mode === "result") {
-      return renderSelectedMachine(selectedMachine || result.machine);
+      return renderSelectedMachine(selectedMachine || normalizeMachineFromResponse(result));
     }
 
     if (result.mode === "not_found") {

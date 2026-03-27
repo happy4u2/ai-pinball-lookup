@@ -2,7 +2,7 @@ function normalizeTitle(text) {
   return (text || "")
     .toLowerCase()
     .replace(/[^\w\s]/g, "")
-    .replace(/\bthe\b/g, "")
+    .replace(/the/g, "")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -10,7 +10,7 @@ function normalizeTitle(text) {
 function baseTitle(text) {
   return normalizeTitle(text)
     .replace(
-      /\b(gold|limited|edition|special|premium|le|collector|anniversary|deluxe|remake|redux|pro|home edition|30th anniversary)\b/g,
+      /(gold|limited|edition|special|premium|le|collector|anniversary|deluxe|remake|redux|pro|home edition|30th anniversary)/g,
       "",
     )
     .replace(/\s+/g, " ")
@@ -18,8 +18,40 @@ function baseTitle(text) {
 }
 
 function extractYear(supplementary) {
-  const match = supplementary?.match(/\b(19|20)\d{2}\b/);
+  const match = supplementary?.match(/(19|20)\d{2}/);
   return match ? Number(match[0]) : null;
+}
+
+function hasExplicitVariantWord(text) {
+  return /(gold|limited|edition|special|premium|le|collector|anniversary|deluxe|remake|redux|pro|home edition|30th anniversary|pinball|forever|returns|66|dark knight)/i.test(
+    text || "",
+  );
+}
+
+function isBroadQuery(query) {
+  const normalized = normalizeTitle(query);
+
+  if (!normalized) {
+    return false;
+  }
+
+  const words = normalized.split(" ").filter(Boolean);
+
+  return (
+    words.length <= 2 &&
+    !/(19|20)\d{2}/.test(normalized) &&
+    !hasExplicitVariantWord(query)
+  );
+}
+
+function startsWithQueryFamily(query, item) {
+  const normalizedQuery = normalizeTitle(query);
+  const normalizedName = normalizeTitle(item.name || item.text || "");
+
+  return (
+    normalizedName === normalizedQuery ||
+    normalizedName.startsWith(`${normalizedQuery} `)
+  );
 }
 
 function scoreResult(query, item) {
@@ -59,7 +91,7 @@ function scoreResult(query, item) {
   ];
 
   for (const word of variantWords) {
-    const re = new RegExp(`\\b${word}\\b`, "i");
+    const re = new RegExp(`\b${word}\b`, "i");
 
     const queryHasWord = re.test(query || "");
     const itemHasWord = re.test(item.name || "") || re.test(item.text || "");
@@ -121,10 +153,26 @@ export function resolveMatch(query, results) {
     (entry) => baseTitle(entry.item.name) === queryBase,
   );
 
+  const relatedPrefixMatches = scored.filter((entry) =>
+    startsWithQueryFamily(query, entry.item),
+  );
+
   const familyTop = sameFamily[0] || null;
   const familySecond = sameFamily[1] || null;
 
-  // 1. Exact / clearly better top match should be selected immediately
+  const queryIsBroad = isBroadQuery(query);
+
+  // 1. If the user searched a broad franchise/base title and OPDB returned
+  // multiple closely related titles (Batman, Batman Forever, Batman 66, etc.),
+  // force a list instead of auto-picking one.
+  if (!queryHasExplicitVariant && queryIsBroad && relatedPrefixMatches.length > 1) {
+    return {
+      mode: "disambiguation",
+      matches: shortlist,
+    };
+  }
+
+  // 2. Exact / clearly better top match should be selected immediately.
   const clearlyBetterOverall = !second || top.score - second.score >= 35;
 
   if (clearlyBetterOverall) {
@@ -135,8 +183,8 @@ export function resolveMatch(query, results) {
     };
   }
 
-  // 2. If user asked for a specific variant, prefer the top match
-  if (queryHasExplicitVariant) {
+  // 3. If user asked for a specific variant, prefer the top match.
+  if (queryHasExplicitVariant || hasExplicitVariantWord(query)) {
     return {
       mode: "selected",
       selectedMatch: top.item,
@@ -144,7 +192,7 @@ export function resolveMatch(query, results) {
     };
   }
 
-  // 3. Only disambiguate within same family when top two family matches are genuinely close
+  // 4. Disambiguate within the same exact family when the top two are close.
   const familyIsAmbiguous =
     familyTop && familySecond && familyTop.score - familySecond.score < 20;
 
@@ -155,7 +203,7 @@ export function resolveMatch(query, results) {
     };
   }
 
-  // 4. Otherwise just select the top result
+  // 5. Otherwise just select the top result.
   return {
     mode: "selected",
     selectedMatch: top.item,

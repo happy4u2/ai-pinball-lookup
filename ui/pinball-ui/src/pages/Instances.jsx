@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { listInstances, createInstance } from "../api/instances";
 import { listCustomers } from "../api";
 
@@ -9,6 +9,7 @@ export default function Instances() {
   const [error, setError] = useState("");
   const [customers, setCustomers] = useState([]);
   const [searchParams] = useSearchParams();
+  const [filterText, setFilterText] = useState("");
 
   const [form, setForm] = useState({
     machineId: "",
@@ -169,6 +170,26 @@ export default function Instances() {
       return updated;
     });
   }
+
+  const filteredInstances = useMemo(() => {
+    const term = filterText.trim().toLowerCase();
+
+    if (!term) return instances;
+
+    return instances.filter((item) =>
+      [
+        item.machineName,
+        item.instanceName,
+        item.instanceId,
+        item.currentLocationLabel,
+        item.currentLocationType,
+        item.status,
+        item.ownershipType,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(term)),
+    );
+  }, [instances, filterText]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -378,11 +399,19 @@ export default function Instances() {
           boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
         }}
       >
-        <h2 style={{ marginTop: 0 }}>Existing Instances</h2>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", marginBottom: "12px", flexWrap: "wrap" }}>
+          <h2 style={{ marginTop: 0, marginBottom: 0 }}>Existing Instances</h2>
+          <input
+            placeholder="Filter instances"
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+            style={{ minWidth: "240px" }}
+          />
+        </div>
 
         {loading ? (
           <p>Loading...</p>
-        ) : instances.length === 0 ? (
+        ) : filteredInstances.length === 0 ? (
           <p>No instances found.</p>
         ) : (
           <table
@@ -401,10 +430,14 @@ export default function Instances() {
               </tr>
             </thead>
             <tbody>
-              {instances.map((item) => (
+              {filteredInstances.map((item) => (
                 <tr key={item.instanceId}>
-                  <td style={tdStyle}>{item.machineName || "—"}</td>
-                  <td style={tdStyle}>{item.instanceName || "—"}</td>
+                  <td style={tdStyle}>
+                    <Link to={`/instances/${encodeURIComponent(item.instanceId)}`} style={{ color: "#2563eb", textDecoration: "none", fontWeight: 600 }}>
+                      {item.machineName || "—"}
+                    </Link>
+                  </td>
+                  <td style={tdStyle}>{item.instanceName || "—"}<div style={{ fontSize: "12px", color: "#64748b", marginTop: "4px" }}>{item.instanceId || ""}</div></td>
                   <td style={tdStyle}>{item.ownershipType || "—"}</td>
                   <td style={tdStyle}>{item.status || "—"}</td>
                   <td style={tdStyle}>

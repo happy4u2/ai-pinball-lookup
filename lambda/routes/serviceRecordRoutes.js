@@ -13,12 +13,20 @@ export async function handleServiceRecordRoutes({ httpMethod, path, body }) {
       return jsonResponse(400, { error: "instanceId is required" });
     }
 
-    const serviceRecord = await createServiceRecord(body);
+    try {
+      const serviceRecord = await createServiceRecord(body);
 
-    return jsonResponse(201, {
-      ok: true,
-      serviceRecord,
-    });
+      return jsonResponse(201, {
+        ok: true,
+        serviceRecord,
+      });
+    } catch (error) {
+      if (error.message === "Instance not found") {
+        return jsonResponse(404, { error: error.message });
+      }
+
+      return jsonResponse(400, { error: error.message || "Failed to create service record" });
+    }
   }
 
   if (httpMethod === "GET" && path.startsWith("/service-records/")) {

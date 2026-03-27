@@ -6,6 +6,7 @@ import {
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "./dynamoClient.js";
+import { getInstance } from "./instanceService.js";
 
 const TABLE_NAME = "pinball_service_history";
 const INSTANCE_INDEX = "instanceId-index";
@@ -19,13 +20,24 @@ export async function createServiceRecord(data) {
     throw new Error("instanceId is required");
   }
 
+  const instance = await getInstance(data.instanceId);
+
+  if (!instance) {
+    throw new Error("Instance not found");
+  }
+
   const now = new Date().toISOString();
 
   const item = {
     serviceId: newServiceId(),
     instanceId: data.instanceId,
-    customerId: data.customerId || null,
-    machineId: data.machineId || null,
+    customerId:
+      data.customerId ||
+      instance.customerId ||
+      instance.ownerCustomerId ||
+      instance.assignedCustomerId ||
+      null,
+    machineId: data.machineId || instance.machineId || null,
     serviceDate: data.serviceDate || now.slice(0, 10),
     technician: data.technician || null,
     serviceType: data.serviceType || "repair",
@@ -93,7 +105,7 @@ export async function getServiceTimelineByInstance(instanceId) {
   return [...items].sort((a, b) => {
     const dateA = a.serviceDate || a.createdAt || "";
     const dateB = b.serviceDate || b.createdAt || "";
-    return dateA.localeCompare(dateB);
+    return dateB.localeCompare(dateA);
   });
 }
 

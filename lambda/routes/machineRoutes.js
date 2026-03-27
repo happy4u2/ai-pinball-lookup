@@ -201,6 +201,7 @@ export async function handleMachineRoutes({ httpMethod, path, body, query }) {
         query: cached.query,
         selectedMatch: cached.selectedMatch,
         result: enrichedMachine,
+        machine: enrichedMachine,
         cache: {
           hit: true,
           cachedAt: cached.cachedAt,
@@ -236,6 +237,7 @@ export async function handleMachineRoutes({ httpMethod, path, body, query }) {
       query: machineDetails.name,
       selectedMatch: payload.selectedMatch,
       result: payload.result,
+      machine: payload.result,
       cache: {
         hit: false,
         cachedAt: null,
@@ -255,6 +257,7 @@ export async function handleMachineRoutes({ httpMethod, path, body, query }) {
       query: cachedByName.query,
       selectedMatch: cachedByName.selectedMatch,
       result: enrichedMachine,
+      machine: enrichedMachine,
       cache: {
         hit: true,
         cachedAt: cachedByName.cachedAt,
@@ -325,6 +328,7 @@ export async function handleMachineRoutes({ httpMethod, path, body, query }) {
       query: machineName,
       selectedMatch: cached.selectedMatch,
       result: enrichedMachine,
+      machine: enrichedMachine,
       cache: {
         hit: true,
         cachedAt: cached.cachedAt,
@@ -350,6 +354,7 @@ export async function handleMachineRoutes({ httpMethod, path, body, query }) {
   };
 
   await saveCachedMachine(`id:${bestMatch.id}`, payload);
+  await saveCachedMachine(nameCacheKey, payload);
 
   return jsonResponse(200, {
     mode: "result",
@@ -357,6 +362,7 @@ export async function handleMachineRoutes({ httpMethod, path, body, query }) {
     query: machineName,
     selectedMatch: payload.selectedMatch,
     result: payload.result,
+    machine: payload.result,
     cache: {
       hit: false,
       cachedAt: null,
