@@ -5,8 +5,8 @@ import {
   getInstance,
   getInstanceHistory,
   updateInstance,
+  listCustomers,
 } from "../api";
-import { listCustomers } from "../api";
 
 const panelStyle = {
   background: "white",
@@ -29,6 +29,22 @@ const badgeStyle = {
   letterSpacing: "0.06em",
 };
 
+const emptyServiceForm = {
+  serviceDate: new Date().toISOString().slice(0, 10),
+  technician: "",
+  serviceType: "repair",
+  workLocation: "workshop",
+  status: "completed",
+  customerReportedIssue: "",
+  diagnosis: "",
+  workPerformed: "",
+  technicianNotes: "",
+  timeSpentHours: "",
+  travelDistanceKm: "",
+  followUpNeeded: false,
+  nextAction: "",
+};
+
 function getCustomerLabel(customer) {
   if (!customer) return "";
 
@@ -47,6 +63,15 @@ function getCustomerLabel(customer) {
   return customer.customerId || "Unnamed customer";
 }
 
+function formatEnumLabel(value = "") {
+  if (!value) return "—";
+
+  return value
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 export default function InstanceDetail() {
   const { instanceId } = useParams();
 
@@ -59,20 +84,17 @@ export default function InstanceDetail() {
   const [serviceSuccess, setServiceSuccess] = useState("");
   const [savingService, setSavingService] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
-
-  const [form, setForm] = useState({
-    serviceType: "repair",
-    status: "completed",
-    serviceDate: new Date().toISOString().slice(0, 10),
-    technician: "David",
-    laborCost: "",
-    diagnosis: "",
-    workPerformed: "",
-    notes: "",
-  });
+  const [form, setForm] = useState(emptyServiceForm);
 
   const quickStatuses = useMemo(
-    () => ["active", "in_service", "awaiting_parts", "ready", "stored", "rented"],
+    () => [
+      "active",
+      "in_service",
+      "awaiting_parts",
+      "ready",
+      "stored",
+      "rented",
+    ],
     [],
   );
 
@@ -125,8 +147,11 @@ export default function InstanceDetail() {
   }, [instanceId]);
 
   function updateField(e) {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setForm((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
   }
 
   async function handleServiceSubmit(e) {
@@ -150,23 +175,25 @@ export default function InstanceDetail() {
           instance.assignedCustomerId ||
           "",
         machineId: instance.machineId || "",
-        serviceType: form.serviceType,
-        status: form.status,
         serviceDate: form.serviceDate,
         technician: form.technician,
-        laborCost: form.laborCost ? Number(form.laborCost) : 0,
+        serviceType: form.serviceType,
+        workLocation: form.workLocation,
+        status: form.status,
+        customerReportedIssue: form.customerReportedIssue,
         diagnosis: form.diagnosis,
         workPerformed: form.workPerformed,
-        notes: form.notes,
+        technicianNotes: form.technicianNotes,
+        timeSpentHours: Number(form.timeSpentHours || 0),
+        travelDistanceKm: Number(form.travelDistanceKm || 0),
+        followUpNeeded: form.followUpNeeded,
+        nextAction: form.nextAction,
       });
 
-      setForm((prev) => ({
-        ...prev,
-        laborCost: "",
-        diagnosis: "",
-        workPerformed: "",
-        notes: "",
-      }));
+      setForm({
+        ...emptyServiceForm,
+        serviceDate: new Date().toISOString().slice(0, 10),
+      });
 
       setServiceSuccess("Service record created.");
       await loadAll();
@@ -183,7 +210,9 @@ export default function InstanceDetail() {
     try {
       setSavingStatus(true);
       setError("");
-      const data = await updateInstance(instance.instanceId, { status: nextStatus });
+      const data = await updateInstance(instance.instanceId, {
+        status: nextStatus,
+      });
       setInstance(data.instance || null);
     } catch (err) {
       setError(err.message || "Failed to update instance status");
@@ -207,7 +236,9 @@ export default function InstanceDetail() {
           Instance Detail
         </div>
         <h1 style={{ margin: "8px 0 0", color: "#0f172a" }}>
-          {instance?.instanceName || instance?.machineName || "Machine Instance"}
+          {instance?.instanceName ||
+            instance?.machineName ||
+            "Machine Instance"}
         </h1>
         <p style={{ marginTop: "8px", color: "#475569" }}>
           Full workshop view for one physical machine, including quick status
@@ -215,7 +246,9 @@ export default function InstanceDetail() {
         </p>
       </div>
 
-      {error && <div style={{ color: "#b91c1c", marginBottom: "16px" }}>{error}</div>}
+      {error && (
+        <div style={{ color: "#b91c1c", marginBottom: "16px" }}>{error}</div>
+      )}
 
       {loading ? (
         <div style={panelStyle}>Loading instance details...</div>
@@ -242,7 +275,9 @@ export default function InstanceDetail() {
                     marginBottom: "10px",
                   }}
                 >
-                  <span style={badgeStyle}>{instance.status || "unknown"}</span>
+                  <span style={badgeStyle}>
+                    {formatEnumLabel(instance.status || "unknown")}
+                  </span>
                   <span
                     style={{
                       ...badgeStyle,
@@ -250,10 +285,16 @@ export default function InstanceDetail() {
                       color: "#334155",
                     }}
                   >
-                    {instance.currentLocationType || "unknown"}
+                    {formatEnumLabel(
+                      instance.currentLocationLabel ||
+                        instance.currentLocationType ||
+                        "unknown",
+                    )}
                   </span>
                 </div>
-                <div style={{ fontSize: "14px", color: "#64748b" }}>Instance ID</div>
+                <div style={{ fontSize: "14px", color: "#64748b" }}>
+                  Instance ID
+                </div>
                 <div style={{ fontFamily: "monospace", color: "#0f172a" }}>
                   {instance.instanceId}
                 </div>
@@ -286,7 +327,9 @@ export default function InstanceDetail() {
               <Info label="Owner" value={ownerLabel} />
               <Info
                 label="Location"
-                value={instance.currentLocationLabel || instance.currentLocationType}
+                value={
+                  instance.currentLocationLabel || instance.currentLocationType
+                }
               />
               <Info label="Condition" value={instance.condition} />
             </div>
@@ -314,13 +357,15 @@ export default function InstanceDetail() {
                         status === instance.status
                           ? "1px solid #1d4ed8"
                           : "1px solid #cbd5e1",
-                      background: status === instance.status ? "#dbeafe" : "white",
+                      background:
+                        status === instance.status ? "#dbeafe" : "white",
                       color: "#0f172a",
                       padding: "8px 14px",
-                      cursor: status === instance.status ? "default" : "pointer",
+                      cursor:
+                        status === instance.status ? "default" : "pointer",
                     }}
                   >
-                    {status}
+                    {formatEnumLabel(status)}
                   </button>
                 ))}
               </div>
@@ -352,39 +397,108 @@ export default function InstanceDetail() {
             }}
           >
             <div style={panelStyle}>
-              <h2 style={{ marginTop: 0, color: "#0f172a" }}>Service History</h2>
-              <p style={{ color: "#64748b", marginTop: 0 }}>Newest records first.</p>
+              <h2 style={{ marginTop: 0, color: "#0f172a" }}>
+                Service History
+              </h2>
+              <p style={{ color: "#64748b", marginTop: 0 }}>
+                Newest records first.
+              </p>
 
               {history.length === 0 ? (
                 <p>No service records found yet.</p>
               ) : (
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr>
-                      <Th>Date</Th>
-                      <Th>Type</Th>
-                      <Th>Status</Th>
-                      <Th>Technician</Th>
-                      <Th>Labor</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {history.map((item) => (
-                      <tr key={item.serviceId}>
-                        <Td>{item.serviceDate || "—"}</Td>
-                        <Td>{item.serviceType || "—"}</Td>
-                        <Td>{item.status || "—"}</Td>
-                        <Td>{item.technician || "—"}</Td>
-                        <Td>{item.laborCost ?? "—"}</Td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div style={{ display: "grid", gap: "12px" }}>
+                  {history.map((item) => (
+                    <div
+                      key={item.serviceId}
+                      style={{
+                        border: "1px solid #e2e8f0",
+                        borderRadius: "12px",
+                        padding: "14px",
+                        background: "#f8fafc",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          color: "#0f172a",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        {item.serviceDate || "No date"} —{" "}
+                        {formatEnumLabel(item.serviceType || "repair")} —{" "}
+                        {formatEnumLabel(item.status || "completed")}
+                      </div>
+
+                      <div
+                        style={{
+                          display: "grid",
+                          gap: "6px",
+                          color: "#475569",
+                          marginBottom: "10px",
+                        }}
+                      >
+                        <div>
+                          <strong>Technician:</strong> {item.technician || "—"}
+                        </div>
+                        <div>
+                          <strong>Location:</strong>{" "}
+                          {formatEnumLabel(item.workLocation || "workshop")}
+                        </div>
+                        <div>
+                          <strong>Time:</strong>{" "}
+                          {item.timeSpentHours ? `${item.timeSpentHours} h` : "—"}
+                        </div>
+                        <div>
+                          <strong>Travel:</strong>{" "}
+                          {item.travelDistanceKm
+                            ? `${item.travelDistanceKm} km`
+                            : "—"}
+                        </div>
+                        <div>
+                          <strong>Follow-up needed:</strong>{" "}
+                          {item.followUpNeeded ? "Yes" : "No"}
+                        </div>
+                      </div>
+
+                      {item.customerReportedIssue ? (
+                        <Section
+                          title="Customer reported issue"
+                          value={item.customerReportedIssue}
+                        />
+                      ) : null}
+
+                      {item.diagnosis ? (
+                        <Section title="Diagnosis" value={item.diagnosis} />
+                      ) : null}
+
+                      {item.workPerformed ? (
+                        <Section
+                          title="Work performed"
+                          value={item.workPerformed}
+                        />
+                      ) : null}
+
+                      {item.technicianNotes ? (
+                        <Section
+                          title="Technician notes"
+                          value={item.technicianNotes}
+                        />
+                      ) : null}
+
+                      {item.nextAction ? (
+                        <Section title="Next action" value={item.nextAction} />
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 
             <div style={panelStyle}>
-              <h2 style={{ marginTop: 0, color: "#0f172a" }}>Add Service Record</h2>
+              <h2 style={{ marginTop: 0, color: "#0f172a" }}>
+                Add Service Record
+              </h2>
               <p style={{ color: "#64748b", marginTop: 0 }}>
                 This is tied directly to the current instance.
               </p>
@@ -400,44 +514,116 @@ export default function InstanceDetail() {
                 </div>
               )}
 
-              <form onSubmit={handleServiceSubmit} style={{ display: "grid", gap: "12px" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                  <select name="serviceType" value={form.serviceType} onChange={updateField}>
+              <form
+                onSubmit={handleServiceSubmit}
+                style={{ display: "grid", gap: "12px" }}
+              >
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "12px",
+                  }}
+                >
+                  <select
+                    name="serviceType"
+                    value={form.serviceType}
+                    onChange={updateField}
+                  >
                     <option value="repair">repair</option>
+                    <option value="diagnostic">diagnostic</option>
+                    <option value="revision">revision</option>
                     <option value="maintenance">maintenance</option>
                     <option value="restoration">restoration</option>
                     <option value="inspection">inspection</option>
+                    <option value="installation">installation</option>
+                    <option value="pickup">pickup</option>
+                    <option value="delivery">delivery</option>
+                    <option value="remote_support">remote_support</option>
+                    <option value="parts_followup">parts_followup</option>
                   </select>
 
-                  <select name="status" value={form.status} onChange={updateField}>
+                  <select
+                    name="status"
+                    value={form.status}
+                    onChange={updateField}
+                  >
                     <option value="completed">completed</option>
                     <option value="open">open</option>
                     <option value="in_progress">in_progress</option>
+                    <option value="awaiting_parts">awaiting_parts</option>
+                    <option value="monitoring">monitoring</option>
+                    <option value="quoted">quoted</option>
+                    <option value="cancelled">cancelled</option>
                   </select>
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "12px",
+                  }}
+                >
+                  <select
+                    name="workLocation"
+                    value={form.workLocation}
+                    onChange={updateField}
+                  >
+                    <option value="workshop">workshop</option>
+                    <option value="customer_site">customer_site</option>
+                    <option value="remote">remote</option>
+                  </select>
+
                   <input
                     name="serviceDate"
                     type="date"
                     value={form.serviceDate}
                     onChange={updateField}
                   />
+                </div>
+
+                <input
+                  name="technician"
+                  placeholder="Technician"
+                  value={form.technician}
+                  onChange={updateField}
+                />
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "12px",
+                  }}
+                >
                   <input
-                    name="technician"
-                    placeholder="Technician"
-                    value={form.technician}
+                    type="number"
+                    step="0.1"
+                    name="timeSpentHours"
+                    placeholder="Time spent (hours)"
+                    value={form.timeSpentHours}
+                    onChange={updateField}
+                  />
+
+                  <input
+                    type="number"
+                    step="0.1"
+                    name="travelDistanceKm"
+                    placeholder="Travel distance (km)"
+                    value={form.travelDistanceKm}
                     onChange={updateField}
                   />
                 </div>
 
-                <input
-                  name="laborCost"
-                  type="number"
-                  placeholder="Labor cost"
-                  value={form.laborCost}
+                <textarea
+                  name="customerReportedIssue"
+                  placeholder="Customer reported issue"
+                  rows={3}
+                  value={form.customerReportedIssue}
                   onChange={updateField}
                 />
+
                 <textarea
                   name="diagnosis"
                   placeholder="Diagnosis"
@@ -445,6 +631,7 @@ export default function InstanceDetail() {
                   value={form.diagnosis}
                   onChange={updateField}
                 />
+
                 <textarea
                   name="workPerformed"
                   placeholder="Work performed"
@@ -452,11 +639,36 @@ export default function InstanceDetail() {
                   value={form.workPerformed}
                   onChange={updateField}
                 />
+
                 <textarea
-                  name="notes"
-                  placeholder="Notes"
+                  name="technicianNotes"
+                  placeholder="Technician notes"
                   rows={3}
-                  value={form.notes}
+                  value={form.technicianNotes}
+                  onChange={updateField}
+                />
+
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    color: "#0f172a",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    name="followUpNeeded"
+                    checked={form.followUpNeeded}
+                    onChange={updateField}
+                  />
+                  Follow-up needed
+                </label>
+
+                <input
+                  name="nextAction"
+                  placeholder="Next action"
+                  value={form.nextAction}
                   onChange={updateField}
                 />
 
@@ -468,6 +680,23 @@ export default function InstanceDetail() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function Section({ title, value }) {
+  return (
+    <div style={{ marginTop: "10px" }}>
+      <div
+        style={{
+          fontWeight: 700,
+          color: "#0f172a",
+          marginBottom: "4px",
+        }}
+      >
+        {title}
+      </div>
+      <div style={{ color: "#475569", lineHeight: 1.6 }}>{value}</div>
     </div>
   );
 }
@@ -493,38 +722,11 @@ function Info({ label, value, mono = false }) {
       >
         {label}
       </div>
-      <div style={{ color: "#0f172a", fontFamily: mono ? "monospace" : "inherit" }}>
+      <div
+        style={{ color: "#0f172a", fontFamily: mono ? "monospace" : "inherit" }}
+      >
         {value || "—"}
       </div>
     </div>
-  );
-}
-
-function Th({ children }) {
-  return (
-    <th
-      style={{
-        textAlign: "left",
-        padding: "10px",
-        borderBottom: "1px solid #e2e8f0",
-        background: "#f8fafc",
-      }}
-    >
-      {children}
-    </th>
-  );
-}
-
-function Td({ children }) {
-  return (
-    <td
-      style={{
-        padding: "10px",
-        borderBottom: "1px solid #eef2f7",
-        verticalAlign: "top",
-      }}
-    >
-      {children}
-    </td>
   );
 }
