@@ -30,7 +30,6 @@ export default function MachineSearch() {
 
       setMachines(unique)
     } catch (err) {
-      console.error("Search failed", err)
     }
 
     setLoading(false)
@@ -77,7 +76,6 @@ export default function MachineSearch() {
 
             <button
               className="px-3 py-1 bg-blue-600 text-white rounded"
-              onClick={() => console.log("Add instance:", m)}
             >
               Add Instance
             </button>

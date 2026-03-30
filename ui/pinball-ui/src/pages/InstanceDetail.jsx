@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { createServiceRecord, getInstance, getInstanceHistory, updateInstance } from "../api";
+import {
+  createServiceRecord,
+  getInstance,
+  getInstanceHistory,
+  updateInstance,
+} from "../api";
+import { listCustomers } from "../api";
 
 const panelStyle = {
   background: "white",
@@ -23,11 +29,30 @@ const badgeStyle = {
   letterSpacing: "0.06em",
 };
 
+function getCustomerLabel(customer) {
+  if (!customer) return "";
+
+  if (customer.name?.trim()) return customer.name;
+
+  const fullName = [customer.firstName, customer.lastName]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  if (fullName) return fullName;
+
+  if (customer.email?.trim()) return customer.email;
+  if (customer.phone?.trim()) return customer.phone;
+
+  return customer.customerId || "Unnamed customer";
+}
+
 export default function InstanceDetail() {
   const { instanceId } = useParams();
 
   const [instance, setInstance] = useState(null);
   const [history, setHistory] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [serviceError, setServiceError] = useState("");
@@ -51,6 +76,23 @@ export default function InstanceDetail() {
     [],
   );
 
+  const ownerLabel = useMemo(() => {
+    if (!instance) return "—";
+
+    const ownerId =
+      instance.ownerCustomerId ||
+      instance.customerId ||
+      instance.assignedCustomerId ||
+      "";
+
+    if (!ownerId) {
+      return "SwissPinball / internal";
+    }
+
+    const customer = customers.find((c) => c.customerId === ownerId);
+    return getCustomerLabel(customer) || ownerId;
+  }, [instance, customers]);
+
   async function loadAll() {
     if (!instanceId) {
       setError("Missing instance ID");
@@ -62,13 +104,15 @@ export default function InstanceDetail() {
       setLoading(true);
       setError("");
 
-      const [instanceData, historyData] = await Promise.all([
+      const [instanceData, historyData, customerData] = await Promise.all([
         getInstance(instanceId),
         getInstanceHistory(instanceId),
+        listCustomers(),
       ]);
 
       setInstance(instanceData.instance || null);
       setHistory(historyData.history || []);
+      setCustomers(customerData.customers || []);
     } catch (err) {
       setError(err.message || "Failed to load instance details");
     } finally {
@@ -151,14 +195,23 @@ export default function InstanceDetail() {
   return (
     <div>
       <div style={{ marginBottom: "24px" }}>
-        <div style={{ fontSize: "13px", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.14em", fontWeight: 700 }}>
+        <div
+          style={{
+            fontSize: "13px",
+            color: "#64748b",
+            textTransform: "uppercase",
+            letterSpacing: "0.14em",
+            fontWeight: 700,
+          }}
+        >
           Instance Detail
         </div>
         <h1 style={{ margin: "8px 0 0", color: "#0f172a" }}>
           {instance?.instanceName || instance?.machineName || "Machine Instance"}
         </h1>
         <p style={{ marginTop: "8px", color: "#475569" }}>
-          Full workshop view for one physical machine, including quick status changes and service history.
+          Full workshop view for one physical machine, including quick status
+          changes and service history.
         </p>
       </div>
 
@@ -171,36 +224,83 @@ export default function InstanceDetail() {
       ) : (
         <div style={{ display: "grid", gap: "18px" }}>
           <div style={{ ...panelStyle, display: "grid", gap: "16px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: "16px",
+                flexWrap: "wrap",
+              }}
+            >
               <div>
-                <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", marginBottom: "10px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "8px",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    marginBottom: "10px",
+                  }}
+                >
                   <span style={badgeStyle}>{instance.status || "unknown"}</span>
-                  <span style={{ ...badgeStyle, background: "#f8fafc", color: "#334155" }}>
+                  <span
+                    style={{
+                      ...badgeStyle,
+                      background: "#f8fafc",
+                      color: "#334155",
+                    }}
+                  >
                     {instance.currentLocationType || "unknown"}
                   </span>
                 </div>
                 <div style={{ fontSize: "14px", color: "#64748b" }}>Instance ID</div>
-                <div style={{ fontFamily: "monospace", color: "#0f172a" }}>{instance.instanceId}</div>
+                <div style={{ fontFamily: "monospace", color: "#0f172a" }}>
+                  {instance.instanceId}
+                </div>
               </div>
 
               <div>
-                <Link to="/instances" style={{ color: "#2563eb", textDecoration: "none", fontWeight: 600 }}>
+                <Link
+                  to="/instances"
+                  style={{
+                    color: "#2563eb",
+                    textDecoration: "none",
+                    fontWeight: 600,
+                  }}
+                >
                   ← Back to instances
                 </Link>
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: "14px",
+              }}
+            >
               <Info label="Machine" value={instance.machineName} />
               <Info label="Instance name" value={instance.instanceName} />
               <Info label="Machine ID" value={instance.machineId} mono />
-              <Info label="Owner" value={instance.ownerCustomerId || instance.customerId || "SwissPinball / internal"} mono />
-              <Info label="Location" value={instance.currentLocationLabel || instance.currentLocationType} />
+              <Info label="Owner" value={ownerLabel} />
+              <Info
+                label="Location"
+                value={instance.currentLocationLabel || instance.currentLocationType}
+              />
               <Info label="Condition" value={instance.condition} />
             </div>
 
             <div>
-              <div style={{ fontWeight: 700, color: "#0f172a", marginBottom: "10px" }}>Quick status</div>
+              <div
+                style={{
+                  fontWeight: 700,
+                  color: "#0f172a",
+                  marginBottom: "10px",
+                }}
+              >
+                Quick status
+              </div>
               <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
                 {quickStatuses.map((status) => (
                   <button
@@ -210,7 +310,10 @@ export default function InstanceDetail() {
                     disabled={savingStatus || status === instance.status}
                     style={{
                       borderRadius: "999px",
-                      border: status === instance.status ? "1px solid #1d4ed8" : "1px solid #cbd5e1",
+                      border:
+                        status === instance.status
+                          ? "1px solid #1d4ed8"
+                          : "1px solid #cbd5e1",
                       background: status === instance.status ? "#dbeafe" : "white",
                       color: "#0f172a",
                       padding: "8px 14px",
@@ -225,13 +328,29 @@ export default function InstanceDetail() {
 
             {instance.notes ? (
               <div>
-                <div style={{ fontWeight: 700, color: "#0f172a", marginBottom: "6px" }}>Notes</div>
-                <div style={{ color: "#475569", lineHeight: 1.6 }}>{instance.notes}</div>
+                <div
+                  style={{
+                    fontWeight: 700,
+                    color: "#0f172a",
+                    marginBottom: "6px",
+                  }}
+                >
+                  Notes
+                </div>
+                <div style={{ color: "#475569", lineHeight: 1.6 }}>
+                  {instance.notes}
+                </div>
               </div>
             ) : null}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: "18px" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1.1fr 1fr",
+              gap: "18px",
+            }}
+          >
             <div style={panelStyle}>
               <h2 style={{ marginTop: 0, color: "#0f172a" }}>Service History</h2>
               <p style={{ color: "#64748b", marginTop: 0 }}>Newest records first.</p>
@@ -266,10 +385,20 @@ export default function InstanceDetail() {
 
             <div style={panelStyle}>
               <h2 style={{ marginTop: 0, color: "#0f172a" }}>Add Service Record</h2>
-              <p style={{ color: "#64748b", marginTop: 0 }}>This is tied directly to the current instance.</p>
+              <p style={{ color: "#64748b", marginTop: 0 }}>
+                This is tied directly to the current instance.
+              </p>
 
-              {serviceError && <div style={{ color: "#b91c1c", marginBottom: "12px" }}>{serviceError}</div>}
-              {serviceSuccess && <div style={{ color: "#15803d", marginBottom: "12px" }}>{serviceSuccess}</div>}
+              {serviceError && (
+                <div style={{ color: "#b91c1c", marginBottom: "12px" }}>
+                  {serviceError}
+                </div>
+              )}
+              {serviceSuccess && (
+                <div style={{ color: "#15803d", marginBottom: "12px" }}>
+                  {serviceSuccess}
+                </div>
+              )}
 
               <form onSubmit={handleServiceSubmit} style={{ display: "grid", gap: "12px" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
@@ -288,14 +417,48 @@ export default function InstanceDetail() {
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                  <input name="serviceDate" type="date" value={form.serviceDate} onChange={updateField} />
-                  <input name="technician" placeholder="Technician" value={form.technician} onChange={updateField} />
+                  <input
+                    name="serviceDate"
+                    type="date"
+                    value={form.serviceDate}
+                    onChange={updateField}
+                  />
+                  <input
+                    name="technician"
+                    placeholder="Technician"
+                    value={form.technician}
+                    onChange={updateField}
+                  />
                 </div>
 
-                <input name="laborCost" type="number" placeholder="Labor cost" value={form.laborCost} onChange={updateField} />
-                <textarea name="diagnosis" placeholder="Diagnosis" rows={3} value={form.diagnosis} onChange={updateField} />
-                <textarea name="workPerformed" placeholder="Work performed" rows={4} value={form.workPerformed} onChange={updateField} />
-                <textarea name="notes" placeholder="Notes" rows={3} value={form.notes} onChange={updateField} />
+                <input
+                  name="laborCost"
+                  type="number"
+                  placeholder="Labor cost"
+                  value={form.laborCost}
+                  onChange={updateField}
+                />
+                <textarea
+                  name="diagnosis"
+                  placeholder="Diagnosis"
+                  rows={3}
+                  value={form.diagnosis}
+                  onChange={updateField}
+                />
+                <textarea
+                  name="workPerformed"
+                  placeholder="Work performed"
+                  rows={4}
+                  value={form.workPerformed}
+                  onChange={updateField}
+                />
+                <textarea
+                  name="notes"
+                  placeholder="Notes"
+                  rows={3}
+                  value={form.notes}
+                  onChange={updateField}
+                />
 
                 <button type="submit" disabled={savingService}>
                   {savingService ? "Saving..." : "Create Service Record"}
@@ -311,8 +474,23 @@ export default function InstanceDetail() {
 
 function Info({ label, value, mono = false }) {
   return (
-    <div style={{ background: "#f8fafc", borderRadius: "12px", padding: "14px", border: "1px solid #e2e8f0" }}>
-      <div style={{ fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.08em", color: "#64748b", marginBottom: "6px" }}>
+    <div
+      style={{
+        background: "#f8fafc",
+        borderRadius: "12px",
+        padding: "14px",
+        border: "1px solid #e2e8f0",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "12px",
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+          color: "#64748b",
+          marginBottom: "6px",
+        }}
+      >
         {label}
       </div>
       <div style={{ color: "#0f172a", fontFamily: mono ? "monospace" : "inherit" }}>
@@ -323,9 +501,30 @@ function Info({ label, value, mono = false }) {
 }
 
 function Th({ children }) {
-  return <th style={{ textAlign: "left", padding: "10px", borderBottom: "1px solid #e2e8f0", background: "#f8fafc" }}>{children}</th>;
+  return (
+    <th
+      style={{
+        textAlign: "left",
+        padding: "10px",
+        borderBottom: "1px solid #e2e8f0",
+        background: "#f8fafc",
+      }}
+    >
+      {children}
+    </th>
+  );
 }
 
 function Td({ children }) {
-  return <td style={{ padding: "10px", borderBottom: "1px solid #eef2f7", verticalAlign: "top" }}>{children}</td>;
+  return (
+    <td
+      style={{
+        padding: "10px",
+        borderBottom: "1px solid #eef2f7",
+        verticalAlign: "top",
+      }}
+    >
+      {children}
+    </td>
+  );
 }

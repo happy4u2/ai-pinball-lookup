@@ -1,19 +1,29 @@
-const API_BASE = "https://cp114tpb2i.execute-api.eu-central-1.amazonaws.com/prod";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  "https://cp114tpb2i.execute-api.eu-central-1.amazonaws.com/prod";
 
-export async function apiRequest(path, options = {}) {
-  const response = await fetch(`${API_BASE}${path}`, {
+export async function apiFetch(path, options = {}) {
+  const url = `${API_BASE_URL}${path}`;
+
+  const response = await fetch(url, {
     headers: {
       "Content-Type": "application/json",
-      ...(options.headers || {}),
+      ...(options.headers || {})
     },
-    ...options,
+    ...options
   });
 
-  const data = await response.json().catch(() => ({}));
+  const contentType = response.headers.get("content-type") || "";
 
   if (!response.ok) {
-    throw new Error(data?.error || data?.message || "API request failed");
+    const text = await response.text();
+    throw new Error(`API ${response.status}: ${text}`);
   }
 
-  return data;
+  if (contentType.includes("application/json")) {
+    return response.json();
+  }
+
+  const text = await response.text();
+  return { message: text };
 }

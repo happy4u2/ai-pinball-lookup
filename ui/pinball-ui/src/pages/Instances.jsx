@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { listInstances, createInstance } from "../api/instances";
 import { listCustomers } from "../api";
 
@@ -10,11 +10,14 @@ export default function Instances() {
   const [customers, setCustomers] = useState([]);
   const [searchParams] = useSearchParams();
   const [filterText, setFilterText] = useState("");
+  const location = useLocation();
+  const prefill = location.state || null;
 
   const [form, setForm] = useState({
     machineId: "",
     machineName: "",
     instanceName: "",
+    serialNumber: "",
     ownershipType: "customer",
     ownerCustomerId: "",
     currentLocationType: "workshop",
@@ -24,10 +27,44 @@ export default function Instances() {
     notes: "",
   });
 
+  useEffect(() => {
+    if (!prefill) return;
+
+    setForm((prev) => ({
+      ...prev,
+      machineId: prefill.machineId || prev.machineId,
+      machineName: prefill.machineName || prev.machineName,
+      instanceName:
+        prev.instanceName ||
+        buildSuggestedInstanceName(
+          prev.ownerCustomerId,
+          prefill.machineName || prev.machineName,
+        ),
+    }));
+  }, [prefill, customers]);
+  function getCustomerLabel(customer) {
+    if (!customer) return "";
+
+    if (customer.name?.trim()) return customer.name;
+
+    const fullName = [customer.firstName, customer.lastName]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+
+    if (fullName) return fullName;
+
+    if (customer.email?.trim()) return customer.email;
+    if (customer.phone?.trim()) return customer.phone;
+
+    return customer.customerId || "Unnamed customer";
+  }
   function buildSuggestedInstanceName(customerId, machineName) {
     const customer = customers.find((c) => c.customerId === customerId);
-    if (customer?.name && machineName) {
-      return `${customer.name} ${machineName}`;
+    const customerLabel = getCustomerLabel(customer);
+
+    if (customerLabel && machineName) {
+      return `${customerLabel} ${machineName}`;
     }
     return machineName || "";
   }
@@ -65,7 +102,7 @@ export default function Instances() {
         const data = await listCustomers();
         setCustomers(data.customers || []);
       } catch (err) {
-        console.error("Failed to load customers", err);
+        // keep silent for now
       }
     }
 
@@ -87,30 +124,27 @@ export default function Instances() {
       }));
     }
   }, [searchParams, customers]);
-  function getSuggestedLocationLabel(
-    locationType,
-    ownershipType,
-    ownerCustomerId,
-  ) {
-    if (locationType === "workshop") {
-      return "SwissPinball Workshop";
-    }
 
-    if (locationType === "storage") {
-      return "Echallens Storage";
-    }
+  function getSuggestedLocationLabel(locationType, ownerCustomerId) {
+  if (locationType === "workshop") {
+    return "SwissPinball Workshop";
+  }
 
-    if (locationType === "customer_site") {
-      const customer = customers.find((c) => c.customerId === ownerCustomerId);
-      return customer?.name || "";
-    }
+  if (locationType === "storage") {
+    return "Echallens Storage";
+  }
 
-    if (locationType === "on_rent") {
-      return "";
-    }
+  if (locationType === "customer_site") {
+    const customer = customers.find((c) => c.customerId === ownerCustomerId);
+    return getCustomerLabel(customer);
+  }
 
+  if (locationType === "on_rent") {
     return "";
   }
+
+  return "";
+}
 
   function updateField(e) {
     const { name, value } = e.target;
@@ -120,6 +154,7 @@ export default function Instances() {
 
       if (name === "ownershipType" && value !== "customer") {
         updated.ownerCustomerId = "";
+
         if (
           !prev.instanceName.trim() ||
           prev.instanceName === prev.machineName
@@ -127,7 +162,6 @@ export default function Instances() {
           updated.instanceName = buildSuggestedInstanceName(
             "",
             prev.machineName,
-            value,
           );
         }
       }
@@ -140,14 +174,12 @@ export default function Instances() {
           updated.instanceName = buildSuggestedInstanceName(
             value,
             prev.machineName,
-            prev.ownershipType,
           );
         }
 
         if (prev.currentLocationType === "customer_site") {
           updated.currentLocationLabel = getSuggestedLocationLabel(
             prev.currentLocationType,
-            prev.ownershipType,
             value,
           );
         }
@@ -161,7 +193,6 @@ export default function Instances() {
         ) {
           updated.currentLocationLabel = getSuggestedLocationLabel(
             value,
-            prev.ownershipType,
             prev.ownerCustomerId,
           );
         }
@@ -204,22 +235,33 @@ export default function Instances() {
       return;
     }
 
-    if (form.ownershipType === "customer" && !form.ownerCustomerId.trim()) {
-      setError("Owner customer is required when ownership type is customer.");
-      return;
-    }
+    if (form.ownershipType === "customer") {
+      const duplicate = instances.find(
+        (i) =>
+          i.ownerCustomerId === form.ownerCustomerId &&
+          i.instanceName?.toLowerCase().trim() ===
+            form.instanceName?.toLowerCase().trim(),
+      );
 
+      if (duplicate) {
+        setError("This customer already has an instance with this name.");
+        return;
+      }
+    }
     try {
       setError("");
       await createInstance(form);
 
-      const machineId = searchParams.get("machineId") || "";
-      const machineName = searchParams.get("machineName") || "";
+      const machineId =
+        searchParams.get("machineId") || prefill?.machineId || "";
+      const machineName =
+        searchParams.get("machineName") || prefill?.machineName || "";
 
       setForm({
         machineId,
         machineName,
         instanceName: "",
+        serialNumber: "",
         ownershipType: "customer",
         ownerCustomerId: "",
         currentLocationType: "workshop",
@@ -234,6 +276,13 @@ export default function Instances() {
       setError(err.message || "Failed to create instance");
     }
   }
+
+  const hasLockedMachine = Boolean(
+    searchParams.get("machineId") ||
+    searchParams.get("machineName") ||
+    prefill?.machineId ||
+    prefill?.machineName,
+  );
 
   return (
     <div>
@@ -272,7 +321,7 @@ export default function Instances() {
               placeholder="Machine ID"
               value={form.machineId}
               onChange={updateField}
-              readOnly={!!searchParams.get("machineId")}
+              readOnly={hasLockedMachine}
             />
           </div>
 
@@ -283,7 +332,7 @@ export default function Instances() {
               placeholder="Machine Name"
               value={form.machineName}
               onChange={updateField}
-              readOnly={!!searchParams.get("machineName")}
+              readOnly={hasLockedMachine}
             />
           </div>
 
@@ -293,6 +342,16 @@ export default function Instances() {
               name="instanceName"
               placeholder="Instance Name"
               value={form.instanceName}
+              onChange={updateField}
+            />
+          </div>
+
+          <div>
+            <label>Serial Number</label>
+            <input
+              name="serialNumber"
+              placeholder="Serial Number"
+              value={form.serialNumber}
               onChange={updateField}
             />
           </div>
@@ -320,7 +379,7 @@ export default function Instances() {
                 <option value="">Select Customer</option>
                 {customers.map((c) => (
                   <option key={c.customerId} value={c.customerId}>
-                    {c.name || c.customerId}
+                    {getCustomerLabel(c)}
                   </option>
                 ))}
               </select>
@@ -399,7 +458,16 @@ export default function Instances() {
           boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", marginBottom: "12px", flexWrap: "wrap" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: "12px",
+            alignItems: "center",
+            marginBottom: "12px",
+            flexWrap: "wrap",
+          }}
+        >
           <h2 style={{ marginTop: 0, marginBottom: 0 }}>Existing Instances</h2>
           <input
             placeholder="Filter instances"
@@ -433,11 +501,29 @@ export default function Instances() {
               {filteredInstances.map((item) => (
                 <tr key={item.instanceId}>
                   <td style={tdStyle}>
-                    <Link to={`/instances/${encodeURIComponent(item.instanceId)}`} style={{ color: "#2563eb", textDecoration: "none", fontWeight: 600 }}>
+                    <Link
+                      to={`/instances/${encodeURIComponent(item.instanceId)}`}
+                      style={{
+                        color: "#2563eb",
+                        textDecoration: "none",
+                        fontWeight: 600,
+                      }}
+                    >
                       {item.machineName || "—"}
                     </Link>
                   </td>
-                  <td style={tdStyle}>{item.instanceName || "—"}<div style={{ fontSize: "12px", color: "#64748b", marginTop: "4px" }}>{item.instanceId || ""}</div></td>
+                  <td style={tdStyle}>
+                    {item.instanceName || "—"}
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: "#64748b",
+                        marginTop: "4px",
+                      }}
+                    >
+                      {item.instanceId || ""}
+                    </div>
+                  </td>
                   <td style={tdStyle}>{item.ownershipType || "—"}</td>
                   <td style={tdStyle}>{item.status || "—"}</td>
                   <td style={tdStyle}>

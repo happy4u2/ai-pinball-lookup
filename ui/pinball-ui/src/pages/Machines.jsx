@@ -2,17 +2,22 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MachineSearch from "../components/MachineSearch";
 
-function buildMachineInstanceParams(machine) {
-  const opdbId = machine?.opdb_id || machine?.id || machine?.machineId || "";
-  const normalizedMachineId = String(opdbId).startsWith("opdb:")
-    ? String(opdbId)
-    : opdbId
-      ? `opdb:${opdbId}`
+function buildMachinePrefill(machine) {
+  const rawId = machine?.machineId || machine?.opdb_id || machine?.opdbId || machine?.id || "";
+  const normalizedMachineId = String(rawId).startsWith("opdb:")
+    ? String(rawId)
+    : rawId
+      ? `opdb:${rawId}`
       : "";
 
   return {
     machineId: normalizedMachineId,
-    machineName: machine?.name || machine?.machineName || machine?.common_name || "",
+    machineName:
+      machine?.name ||
+      machine?.machineName ||
+      machine?.common_name ||
+      machine?.title ||
+      "",
   };
 }
 
@@ -27,8 +32,9 @@ export default function Machines() {
   function handleCreateInstance() {
     if (!selectedMachine) return;
 
-    const params = new URLSearchParams(buildMachineInstanceParams(selectedMachine));
-    navigate(`/instances?${params.toString()}`);
+    navigate("/instances/new", {
+      state: buildMachinePrefill(selectedMachine),
+    });
   }
 
   return (
@@ -63,7 +69,10 @@ export default function Machines() {
 
           <p>
             <strong>Name:</strong>{" "}
-            {selectedMachine.name || selectedMachine.machineName || "—"}
+            {selectedMachine.name ||
+              selectedMachine.machineName ||
+              selectedMachine.common_name ||
+              "—"}
           </p>
 
           <p>
@@ -73,10 +82,10 @@ export default function Machines() {
 
           <p>
             <strong>Machine ID:</strong>{" "}
-            {buildMachineInstanceParams(selectedMachine).machineId || "—"}
+            {buildMachinePrefill(selectedMachine).machineId || "—"}
           </p>
 
-          <button onClick={handleCreateInstance}>
+          <button type="button" onClick={handleCreateInstance}>
             Create Instance from this Machine
           </button>
         </div>

@@ -16,6 +16,7 @@ export default function App() {
       <Route path="/customers" element={<Customers />} />
       <Route path="/machines" element={<Machines />} />
       <Route path="/instances" element={<Instances />} />
+      <Route path="/instances/new" element={<Instances />} />
       <Route path="/instances/:instanceId" element={<InstanceDetail />} />
       <Route path="/service" element={<Service />} />
     </Routes>

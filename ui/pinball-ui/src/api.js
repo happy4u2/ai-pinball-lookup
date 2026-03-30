@@ -1,42 +1,91 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 
-async function handleResponse(res, defaultMessage) {
-  const contentType = res.headers.get("content-type") || "";
-
-  let data;
-  if (contentType.includes("application/json")) {
-    data = await res.json();
-  } else {
-    const text = await res.text();
-    data = { message: text };
+async function handleResponse(response) {
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`API error ${response.status}: ${text}`);
   }
-
-  if (!res.ok) {
-    throw new Error(
-      data?.error || data?.message || `${defaultMessage}: ${res.status}`,
-    );
-  }
-
-  return data;
+  return response.json();
 }
 
-export async function searchMachineByName(name) {
-  const url = `${API_BASE_URL}/machine?name=${encodeURIComponent(name)}`;
-  const res = await fetch(url);
+async function apiGet(path) {
+  const response = await fetch(`${API_BASE}${path}`);
+  return handleResponse(response);
+}
 
-  return handleResponse(res, "Machine lookup failed");
+async function apiPost(path, payload) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(response);
+}
+
+async function apiPut(path, payload) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(response);
+}
+
+// --------------------
+// MACHINES
+// --------------------
+
+export async function searchMachineCandidates(query) {
+  return apiGet(`/machine?q=${encodeURIComponent(query)}`);
+}
+
+export async function searchMachineByName(query) {
+  return apiGet(`/machine?name=${encodeURIComponent(query)}`);
 }
 
 export async function getMachineById(machineId) {
-  const url = `${API_BASE_URL}/machine?id=${encodeURIComponent(machineId)}`;
-  const res = await fetch(url);
+  return apiGet(`/machine?id=${encodeURIComponent(machineId)}`);
+}
 
-  return handleResponse(res, "Machine load failed");
+export async function getMachine(machineId) {
+  return getMachineById(machineId);
+}
+
+export async function getEnrichedMachineById(machineId) {
+  return apiGet(`/machine/enriched?id=${encodeURIComponent(machineId)}`);
+}
+
+export async function updateMachineMetadata(payload) {
+  return apiPost(`/machine`, payload);
+}
+
+// --------------------
+// CUSTOMERS
+// --------------------
+
+export async function listCustomers() {
+  return apiGet(`/customers`);
+}
+
+export async function getCustomerById(customerId) {
+  return apiGet(`/customers/${encodeURIComponent(customerId)}`);
+}
+
+export async function getCustomer(customerId) {
+  return getCustomerById(customerId);
 }
 
 export async function createCustomer(customerData) {
   const payload = {
     name: `${customerData.firstName || ""} ${customerData.lastName || ""}`.trim(),
+    firstName: customerData.firstName || "",
+    lastName: customerData.lastName || "",
     phone: customerData.phone || "",
     email: customerData.email || "",
     address: [
@@ -46,86 +95,74 @@ export async function createCustomer(customerData) {
     ]
       .filter(Boolean)
       .join(", "),
+    addressLine1: customerData.addressLine1 || "",
+    postalCode: customerData.postalCode || "",
+    city: customerData.city || "",
     notes: customerData.notes || "",
   };
 
-  const url = `${API_BASE_URL}/customers`;
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  return handleResponse(res, "Create customer failed");
+  return apiPost(`/customers`, payload);
 }
 
-export async function listInstances() {
-  const res = await fetch(`${API_BASE_URL}/instances`);
+export async function updateCustomer(customerId, payload) {
+  return apiPut(`/customers/${encodeURIComponent(customerId)}`, payload);
+}
 
-  return handleResponse(res, "Failed to load instances");
+// --------------------
+// INSTANCES
+// --------------------
+
+export async function listInstances(filters = {}) {
+  const params = new URLSearchParams();
+
+  if (filters.customerId) {
+    params.set("customerId", filters.customerId);
+  }
+
+  if (filters.machineId) {
+    params.set("machineId", filters.machineId);
+  }
+
+  const query = params.toString();
+  return apiGet(`/instances${query ? `?${query}` : ""}`);
+}
+
+export async function getInstanceById(instanceId) {
+  return apiGet(`/instances/${encodeURIComponent(instanceId)}`);
+}
+
+export async function getInstance(instanceId) {
+  return getInstanceById(instanceId);
 }
 
 export async function createInstance(payload) {
-  const res = await fetch(`${API_BASE_URL}/instances`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  return handleResponse(res, "Failed to create instance");
-}
-
-
-
-export async function getInstance(instanceId) {
-  const res = await fetch(
-    `${API_BASE_URL}/instances/${encodeURIComponent(instanceId)}`,
-  );
-
-  return handleResponse(res, "Failed to load instance");
+  return apiPost(`/instances`, payload);
 }
 
 export async function updateInstance(instanceId, payload) {
-  const res = await fetch(
-    `${API_BASE_URL}/instances/${encodeURIComponent(instanceId)}`,
-    {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    },
-  );
-
-  return handleResponse(res, "Failed to update instance");
+  return apiPut(`/instances/${encodeURIComponent(instanceId)}`, payload);
 }
 
 export async function getInstanceHistory(instanceId) {
-  const res = await fetch(
-    `${API_BASE_URL}/instances/${encodeURIComponent(instanceId)}/history`,
-  );
+  return apiGet(`/instances/${encodeURIComponent(instanceId)}/history`);
+}
 
-  return handleResponse(res, "Failed to load instance history");
+// --------------------
+// SERVICE RECORDS
+// --------------------
+
+export async function getServiceRecordById(serviceId) {
+  return apiGet(`/service-records/${encodeURIComponent(serviceId)}`);
+}
+
+export async function getServiceRecord(serviceId) {
+  return getServiceRecordById(serviceId);
 }
 
 export async function createServiceRecord(payload) {
-  const res = await fetch(`${API_BASE_URL}/service-records`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  return handleResponse(res, "Failed to create service record");
+  return apiPost(`/service-records`, payload);
 }
 
-export async function listCustomers() {
-  const res = await fetch(`${API_BASE_URL}/customers`);
-  return handleResponse(res, "Failed to load customers");
+export async function updateServiceRecord(serviceId, payload) {
+  return apiPut(`/service-records/${encodeURIComponent(serviceId)}`, payload);
 }
