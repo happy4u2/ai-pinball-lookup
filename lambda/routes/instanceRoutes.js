@@ -4,6 +4,8 @@ import {
   listInstances,
   listInstancesByCustomer,
   listInstancesByMachine,
+  getInstanceStatusHistory,
+  getInstanceServiceHistory,
   updateInstance,
 } from "../scripts/instanceService.js";
 import { getPathId, jsonResponse } from "./routeUtils.js";

@@ -8,12 +8,14 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "./dynamoClient.js";
 import { writeInstanceStatusHistory } from "../scripts/workflowHelpers.js";
-import { debug } from "node:console";
 
 const TABLE_NAME = process.env.INSTANCE_TABLE || "pinball_machine_instances";
 const STATUS_HISTORY_TABLE =
   process.env.INSTANCE_STATUS_HISTORY_TABLE ||
   "pinball_instance_status_history";
+
+const SERVICE_HISTORY_TABLE =
+  process.env.SERVICE_HISTORY_TABLE || "pinball_service_history";
 
 const ALLOWED_OWNERSHIP_TYPES = new Set([
   "customer",
@@ -298,6 +300,48 @@ export async function listInstancesByMachine(machineId) {
   );
 
   return result.Items || [];
+}
+
+export async function getInstanceStatusHistory(instanceId) {
+  const result = await docClient.send(
+    new QueryCommand({
+      TableName: STATUS_HISTORY_TABLE,
+      IndexName: "instanceId-index",
+      KeyConditionExpression: "instanceId = :instanceId",
+      ExpressionAttributeValues: {
+        ":instanceId": instanceId,
+      },
+    })
+  );
+
+  const items = result.Items || [];
+
+  return items.sort((a, b) => {
+    const aTime = a.changedAt || "";
+    const bTime = b.changedAt || "";
+    return bTime.localeCompare(aTime);
+  });
+}
+
+export async function getInstanceServiceHistory(instanceId) {
+  const result = await docClient.send(
+    new QueryCommand({
+      TableName: SERVICE_HISTORY_TABLE,
+      IndexName: "instanceId-index",
+      KeyConditionExpression: "instanceId = :instanceId",
+      ExpressionAttributeValues: {
+        ":instanceId": instanceId,
+      },
+    })
+  );
+
+  const items = result.Items || [];
+
+  return items.sort((a, b) => {
+    const aTime = a.createdAt || a.serviceDate || "";
+    const bTime = b.createdAt || b.serviceDate || "";
+    return bTime.localeCompare(aTime);
+  });
 }
 
 /*
