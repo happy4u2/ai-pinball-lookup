@@ -7,8 +7,11 @@ import {
   QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "./dynamoClient.js";
+import { writeInstanceStatusHistory } from "../scripts/workflowHelpers.js";
 
 const TABLE_NAME = process.env.INSTANCE_TABLE || "pinball_machine_instances";
+const STATUS_HISTORY_TABLE =
+  process.env.INSTANCE_STATUS_HISTORY_TABLE || "pinball_instance_status_history";
 
 const ALLOWED_OWNERSHIP_TYPES = new Set([
   "customer",
@@ -45,6 +48,20 @@ const ALLOWED_STATUS = new Set([
   "rented",
   "sold",
   "out_of_service",
+  "unknown",
+]);
+
+const ALLOWED_SUB_STATUS = new Set([
+  "diagnostics",
+  "board_work",
+  "mechanical",
+  "electrical",
+  "awaiting_pickup",
+  "awaiting_delivery",
+  "waiting_customer",
+  "waiting_quote_approval",
+  "waiting_parts",
+  "none",
   "unknown",
 ]);
 
@@ -94,6 +111,14 @@ function normalizeStatus(value) {
   return sanitizeEnum(value, ALLOWED_STATUS, "active");
 }
 
+function normalizeSubStatus(value) {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  return sanitizeEnum(value, ALLOWED_SUB_STATUS, "unknown");
+}
+
 function buildNormalizedInstancePayload(data = {}, existing = null) {
   const customerId = sanitizeNullableString(data.customerId);
   const ownershipType = normalizeOwnershipType(
@@ -131,6 +156,7 @@ function buildNormalizedInstancePayload(data = {}, existing = null) {
     rentalStatus,
     condition: sanitizeString(data.condition || existing?.condition || "unknown"),
     status: normalizeStatus(data.status || existing?.status || "active"),
+    subStatus: normalizeSubStatus(data.subStatus ?? existing?.subStatus ?? null),
     serialNumber: sanitizeString(data.serialNumber || existing?.serialNumber),
     notes: sanitizeString(data.notes || existing?.notes),
     tags:
@@ -170,6 +196,7 @@ export async function createInstance(data) {
     // state
     condition: normalized.condition,
     status: normalized.status,
+    subStatus: normalized.subStatus,
     serialNumber: normalized.serialNumber,
     notes: normalized.notes,
     tags: normalized.tags,
@@ -285,6 +312,15 @@ export async function updateInstance(instanceId, data) {
     throw new Error("Missing ownerCustomerId for customer-owned instance");
   }
 
+  const previousStatus = existing.status || null;
+  const nextStatus = normalized.status || null;
+
+  const previousSubStatus = existing.subStatus || null;
+  const nextSubStatus = normalized.subStatus || null;
+
+  const statusChanged =
+    previousStatus !== nextStatus || previousSubStatus !== nextSubStatus;
+
   const updates = [];
   const names = {};
   const values = {};
@@ -307,6 +343,7 @@ export async function updateInstance(instanceId, data) {
 
     condition: normalized.condition,
     status: normalized.status,
+    subStatus: normalized.subStatus,
     serialNumber: normalized.serialNumber,
     notes: normalized.notes,
     tags: normalized.tags,
@@ -332,6 +369,20 @@ export async function updateInstance(instanceId, data) {
       ReturnValues: "ALL_NEW",
     })
   );
+
+  if (statusChanged) {
+    await writeInstanceStatusHistory({
+      dynamo: docClient,
+      tableName: STATUS_HISTORY_TABLE,
+      instanceId,
+      fromStatus: previousStatus,
+      toStatus: nextStatus,
+      fromSubStatus: previousSubStatus,
+      toSubStatus: nextSubStatus,
+      changedBy: "system",
+      note: sanitizeString(data.statusNote || ""),
+    });
+  }
 
   return result.Attributes || null;
 }
