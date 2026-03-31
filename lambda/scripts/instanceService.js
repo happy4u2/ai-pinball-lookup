@@ -8,10 +8,12 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "./dynamoClient.js";
 import { writeInstanceStatusHistory } from "../scripts/workflowHelpers.js";
+import { debug } from "node:console";
 
 const TABLE_NAME = process.env.INSTANCE_TABLE || "pinball_machine_instances";
 const STATUS_HISTORY_TABLE =
-  process.env.INSTANCE_STATUS_HISTORY_TABLE || "pinball_instance_status_history";
+  process.env.INSTANCE_STATUS_HISTORY_TABLE ||
+  "pinball_instance_status_history";
 
 const ALLOWED_OWNERSHIP_TYPES = new Set([
   "customer",
@@ -122,7 +124,7 @@ function normalizeSubStatus(value) {
 function buildNormalizedInstancePayload(data = {}, existing = null) {
   const customerId = sanitizeNullableString(data.customerId);
   const ownershipType = normalizeOwnershipType(
-    data.ownershipType || existing?.ownershipType
+    data.ownershipType || existing?.ownershipType,
   );
 
   const ownerCustomerId =
@@ -135,7 +137,7 @@ function buildNormalizedInstancePayload(data = {}, existing = null) {
     sanitizeNullableString(data.assignedCustomerId) || null;
 
   const rentalStatus = normalizeRentalStatus(
-    data.rentalStatus || existing?.rentalStatus
+    data.rentalStatus || existing?.rentalStatus,
   );
 
   return {
@@ -145,18 +147,22 @@ function buildNormalizedInstancePayload(data = {}, existing = null) {
     instanceName: sanitizeString(data.instanceName || existing?.instanceName),
     location: sanitizeString(data.location || existing?.location),
     currentLocationType: normalizeLocationType(
-      data.currentLocationType || existing?.currentLocationType
+      data.currentLocationType || existing?.currentLocationType,
     ),
     currentLocationLabel: sanitizeString(
-      data.currentLocationLabel || existing?.currentLocationLabel
+      data.currentLocationLabel || existing?.currentLocationLabel,
     ),
     ownershipType,
     ownerCustomerId,
     assignedCustomerId,
     rentalStatus,
-    condition: sanitizeString(data.condition || existing?.condition || "unknown"),
+    condition: sanitizeString(
+      data.condition || existing?.condition || "unknown",
+    ),
     status: normalizeStatus(data.status || existing?.status || "active"),
-    subStatus: normalizeSubStatus(data.subStatus ?? existing?.subStatus ?? null),
+    subStatus: normalizeSubStatus(
+      data.subStatus ?? existing?.subStatus ?? null,
+    ),
     serialNumber: sanitizeString(data.serialNumber || existing?.serialNumber),
     notes: sanitizeString(data.notes || existing?.notes),
     tags:
@@ -221,7 +227,7 @@ export async function createInstance(data) {
     new PutCommand({
       TableName: TABLE_NAME,
       Item: instance,
-    })
+    }),
   );
 
   return instance;
@@ -236,7 +242,7 @@ export async function getInstance(instanceId) {
     new GetCommand({
       TableName: TABLE_NAME,
       Key: { instanceId },
-    })
+    }),
   );
 
   return result.Item || null;
@@ -250,7 +256,7 @@ export async function listInstances() {
   const result = await docClient.send(
     new ScanCommand({
       TableName: TABLE_NAME,
-    })
+    }),
   );
 
   return result.Items || [];
@@ -269,7 +275,7 @@ export async function listInstancesByCustomer(customerId) {
       ExpressionAttributeValues: {
         ":customerId": customerId,
       },
-    })
+    }),
   );
 
   return result.Items || [];
@@ -288,7 +294,7 @@ export async function listInstancesByMachine(machineId) {
       ExpressionAttributeValues: {
         ":machineId": machineId,
       },
-    })
+    }),
   );
 
   return result.Items || [];
@@ -307,6 +313,16 @@ export async function updateInstance(instanceId, data) {
 
   const timestamp = nowIso();
   const normalized = buildNormalizedInstancePayload(data, existing);
+
+  //debug
+  console.log("INSTANCE UPDATE DEBUG", {
+    instanceId,
+    incomingData: data,
+    previousStatus: existing.status || null,
+    previousSubStatus: existing.subStatus || null,
+    nextStatus: normalized.status || null,
+    nextSubStatus: normalized.subStatus || null,
+  });
 
   if (normalized.ownershipType === "customer" && !normalized.ownerCustomerId) {
     throw new Error("Missing ownerCustomerId for customer-owned instance");
@@ -367,8 +383,11 @@ export async function updateInstance(instanceId, data) {
       ExpressionAttributeNames: names,
       ExpressionAttributeValues: values,
       ReturnValues: "ALL_NEW",
-    })
+    }),
   );
+
+  //DEBUG
+  console.log("INSTANCE STATUS CHANGED?", { statusChanged });
 
   if (statusChanged) {
     await writeInstanceStatusHistory({
@@ -381,6 +400,16 @@ export async function updateInstance(instanceId, data) {
       toSubStatus: nextSubStatus,
       changedBy: "system",
       note: sanitizeString(data.statusNote || ""),
+    });
+
+    //DEBUG
+    console.log("WRITING STATUS HISTORY", {
+      tableName: STATUS_HISTORY_TABLE,
+      instanceId,
+      fromStatus: previousStatus,
+      toStatus: nextStatus,
+      fromSubStatus: previousSubStatus,
+      toSubStatus: nextSubStatus,
     });
   }
 
